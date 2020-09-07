@@ -757,8 +757,12 @@ static int forthi_word_semicolon_code(ForthContext* ctx)
 
 static int forthi_word_less_than(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 2) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    int64_t n1 = ctx->stack[ctx->stack_pointer].int_value;
+    int64_t n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
+    return forthi_pushIntNumber(ctx, n1 < n2 ? -1 : 0);
 }
 
 static int forthi_word_less_number_sign(ForthContext* ctx)
@@ -769,20 +773,32 @@ static int forthi_word_less_number_sign(ForthContext* ctx)
 
 static int forthi_word_not_equals(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 2) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    int64_t n1 = ctx->stack[ctx->stack_pointer].int_value;
+    int64_t n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
+    return forthi_pushIntNumber(ctx, n1 != n2 ? -1 : 0);
 }
 
 static int forthi_word_equals(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 2) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    int64_t n1 = ctx->stack[ctx->stack_pointer].int_value;
+    int64_t n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
+    return forthi_pushIntNumber(ctx, n1 == n2 ? -1 : 0);
 }
 
 static int forthi_word_greater_than(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 2) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    int64_t n1 = ctx->stack[ctx->stack_pointer].int_value;
+    int64_t n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
+    return forthi_pushIntNumber(ctx, n1 > n2 ? -1 : 0);
 }
 
 static int forthi_word_to_body(ForthContext* ctx)
@@ -1117,8 +1133,8 @@ static int forthi_word_COUNT(ForthContext* ctx)
 
 static int forthi_word_c_r(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    FORTH_LOG(ctx, "\n");
+    return FORTH_SUCCESS;
 }
 
 static int forthi_word_CREATE(ForthContext* ctx)
@@ -1405,8 +1421,12 @@ static int forthi_word_ELSE(ForthContext* ctx)
 
 static int forthi_word_EMIT(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+     if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    char c = (char)ctx->stack[ctx->stack_pointer].int_value;
+    FORTH_LOG(ctx, "%c", c);
+    return FORTH_SUCCESS;
 }
 
 static int forthi_word_emit_question(ForthContext* ctx)
