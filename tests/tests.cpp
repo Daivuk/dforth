@@ -529,7 +529,15 @@ TEST_CASE("colon", "[colon]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, ":", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, ": foo 100 + ; 1000 foo", FORTH_SUCCESS, {1100});
+    evalTestSection(ctx, ": foo : bar ; ;", FORTH_FAILURE, {}, "");
+    evalTestSection(ctx, "foo foo1 foo foo2", FORTH_FAILURE, {}, "");
+    evalTestSection(ctx, ": GDX 123 ; : GDX GDX 234 ; GDX", FORTH_SUCCESS, {123, 234});
+
+    //    forth::eval(ctx, ": print-stack-top  cr dup .\" The top of the stack is \" . cr .\" which looks like '\" dup emit .\" ' in ascii  \" ;");
+    //forth::eval(ctx, "48 print-stack-top");
+
+    //REQUIRE(LogCapturer::log == "\nThe top of the stack is 48 \nwhich looks like '0' in ascii  ");
 
     forth_destroyContext(ctx);
 }
@@ -547,7 +555,7 @@ TEST_CASE("semicolon", "[semicolon]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, ";", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, ";", FORTH_FAILURE, {}, "Unexpected ';'\n");
 
     forth_destroyContext(ctx);
 }

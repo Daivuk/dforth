@@ -47,6 +47,8 @@ typedef struct ForthContext
     int stack_pointer;
     int (*log)(struct ForthContext*, const char *fmt, ...);
     int program_pointer;
+    const char* code;
+    int state;
 } ForthContext;
 
 // Create a context. Returns NULL if failed to create
@@ -69,8 +71,11 @@ int forth_eval(ForthContext* ctx, const char* code);
 
 #include <math.h>
 
-#define DEFAULT_CELL_COUNT 1024 // 8k
-#define DEFAULT_STACK_SIZE 1024 // 8k
+#define FORTHI_DEFAULT_CELL_COUNT 1024 // 8k
+#define FORTHI_DEFAULT_STACK_SIZE 1024 // 8k
+
+#define FORTHI_STATE_INTERPRET 0
+#define FORTHI_STATE_COMPILE 1
 
 #define FORTH_LOG(_ctx_, _fmt_, ...) \
 { \
@@ -119,7 +124,6 @@ static int forthi_addWord(ForthContext* ctx, const char* name, int (*fn)(ForthCo
 
     word->cell_offset = -1;
     word->fn = fn;
-    word->next = NULL;
 
     word->name_len = strlen(name);
     word->name = (char*)malloc(word->name_len + 1);
@@ -131,14 +135,216 @@ static int forthi_addWord(ForthContext* ctx, const char* name, int (*fn)(ForthCo
     memcpy(word->name, name, word->name_len);
     word->name[word->name_len] = '\0';
     
-    if (!ctx->words)
-        ctx->words = word;
-    else
+    word->next = NULL;
+    if (ctx->words)
+        word->next = ctx->words;
+    ctx->words = word;
+
+    return FORTH_SUCCESS;
+}
+
+static int forthi_isSpace(char c)
+{
+    return !c || c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+static const char* forthi_trimCode(ForthContext* ctx)
+{
+    while (*ctx->code && forthi_isSpace(*ctx->code))
+        ctx->code++;
+
+    return ctx->code;
+}
+
+static const char* forthi_getNextToken(ForthContext* ctx, size_t* token_len)
+{
+    const char* token_start = forthi_trimCode(ctx);
+
+    while (*ctx->code)
     {
-        auto last = ctx->words;
-        while (last->next)
-            last = last->next;
-        last->next = word;
+        ctx->code++;
+        if (forthi_isSpace(*ctx->code))
+        {
+            *token_len = ctx->code - token_start;
+            return token_start;
+        }
+    }
+
+    return NULL;
+}
+
+static int forthi_isTokenNumber(const char* token, size_t token_len)
+{
+    if (*token >= '0' && *token <= '9')
+        return 1;
+
+    if (*token == '-' && token_len > 1)
+        if (token[1] >= '0' && token[1] <= '9')
+            return 1;
+
+    return 0;
+}
+
+static ForthWord* forthi_skipWordBeingCompiled(ForthContext* ctx, ForthWord* word)
+{
+    if (word && ctx->state == FORTHI_STATE_COMPILE)
+        word = word->next;
+    return word;
+}
+
+static ForthWord* forthi_getWord(ForthContext* ctx, const char* name, size_t name_len)
+{
+    auto word = forthi_skipWordBeingCompiled(ctx, ctx->words);
+
+    while (word)
+    {
+        if (word->name_len == name_len && strncmp(word->name, name, name_len) == 0)
+            return word;
+
+        word = word->next;
+    }
+
+    return NULL;
+}
+
+static int forthi_word_semicolon(ForthContext* ctx);
+
+static int forthi_addCompiledCall(ForthContext* ctx, int (*fn)(ForthContext* ctx))
+{
+    if (fn == forthi_word_semicolon)
+        return forthi_word_semicolon(ctx);
+
+    if (ctx->cell_pointer + 1 > ctx->cell_count)
+    {
+        FORTH_LOG(ctx, "Out of program memory\n");
+        return FORTH_FAILURE;
+    }
+
+    ctx->cells[ctx->cell_pointer++].fn = fn;
+
+    return FORTH_SUCCESS;
+}
+
+static int forthi_execute(ForthContext* ctx, int offset);
+
+static int forthi_compiled_executeSub(ForthContext* ctx)
+{
+    int offset = (int)ctx->cells[ctx->program_pointer++].int_value;
+    return forthi_execute(ctx, offset);
+}
+
+static int forthi_addCompiledSub(ForthContext* ctx, int offset)
+{
+    if (ctx->cell_pointer + 2 > ctx->cell_count)
+    {
+        FORTH_LOG(ctx, "Out of program memory\n");
+        return FORTH_FAILURE;
+    }
+
+    ctx->cells[ctx->cell_pointer++].fn = forthi_compiled_executeSub;
+    ctx->cells[ctx->cell_pointer++].int_value = (int64_t)offset;
+
+    return FORTH_SUCCESS;
+}
+
+static int forthi_compiled_pushIntNumber(ForthContext* ctx)
+{
+    return forthi_pushIntNumber(ctx, ctx->cells[ctx->program_pointer++].int_value);
+}
+
+static int forthi_addCompiledIntNumber(ForthContext* ctx, int64_t number)
+{
+    if (ctx->cell_pointer + 2 > ctx->cell_count)
+    {
+        FORTH_LOG(ctx, "Out of program memory\n");
+        return FORTH_FAILURE;
+    }
+
+    ctx->cells[ctx->cell_pointer++].fn = forthi_compiled_pushIntNumber;
+    ctx->cells[ctx->cell_pointer++].int_value = number;
+
+    return FORTH_SUCCESS;
+}
+
+static int forthi_compiled_return(ForthContext* ctx)
+{
+    return FORTH_SUCCESS;
+}
+
+static int forthi_addCompiledReturn(ForthContext* ctx)
+{
+    ctx->state = FORTHI_STATE_INTERPRET;
+    forthi_addCompiledCall(ctx, forthi_compiled_return);
+    return FORTH_SUCCESS;
+}
+
+static int forthi_execute(ForthContext* ctx, int offset)
+{
+    int previous_offset = ctx->program_pointer;
+    ctx->program_pointer = offset;
+
+    ForthCell* cell = &ctx->cells[ctx->program_pointer++];
+    while (cell->fn != forthi_compiled_return)
+    {
+        if (cell->fn(ctx) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        cell = &ctx->cells[ctx->program_pointer++];
+    }
+
+    ctx->program_pointer = previous_offset;
+    return FORTH_SUCCESS;
+}
+
+static int forthi_interpretToken(ForthContext* ctx, const char* token, size_t token_len)
+{
+    ForthWord* word = forthi_getWord(ctx, token, token_len);
+    if (word)
+    {
+        if (ctx->state == FORTHI_STATE_INTERPRET)
+        {
+            if (word->fn)
+                return word->fn(ctx);
+            else
+                return forthi_execute(ctx, word->cell_offset);
+        }
+        else if (ctx->state == FORTHI_STATE_COMPILE)
+        {
+            if (word->fn)
+                return forthi_addCompiledCall(ctx, word->fn);
+            else
+                return forthi_addCompiledSub(ctx, word->cell_offset);
+        }
+
+        return FORTH_FAILURE;
+    }
+
+    if (forthi_isTokenNumber(token, token_len))
+    {
+        int64_t number = atoi(token);
+        if (ctx->state == FORTHI_STATE_INTERPRET)
+        {
+            return forthi_pushIntNumber(ctx, number);
+        }
+        else  if (ctx->state == FORTHI_STATE_COMPILE)
+        {
+            return forthi_addCompiledIntNumber(ctx, number);
+        }
+
+        return FORTH_FAILURE;
+    }
+
+    return FORTH_FAILURE;
+}
+
+static int forthi_interpret(ForthContext* ctx)
+{
+    const char* token;
+    size_t token_len;
+    while (token = forthi_getNextToken(ctx, &token_len))
+    {
+        if (forthi_interpretToken(ctx, token, token_len) == FORTH_FAILURE)
+            return FORTH_FAILURE;
     }
 
     return FORTH_SUCCESS;
@@ -479,8 +685,49 @@ static int forthi_word_two_variable(ForthContext* ctx)
 
 static int forthi_word_colon(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (ctx->state == FORTHI_STATE_COMPILE)
+    {
+        FORTH_LOG(ctx, "Unexpected ':'\n");
+        return FORTH_FAILURE;
+    }
+
+    size_t word_name_len;
+    const char* word_name = forthi_getNextToken(ctx, &word_name_len);
+    if (!word_name || !word_name_len)
+    {
+        FORTH_LOG(ctx, "Expected name after ':'\n");
+        return FORTH_FAILURE;
+    }
+
+    char* name = (char*)malloc(word_name_len + 1);
+    if (!name)
+    {
+        FORTH_LOG(ctx, "Out of memory\n");
+        return FORTH_FAILURE;
+    }
+    memcpy(name, word_name, word_name_len);
+    name[word_name_len] = '\0';
+
+    ForthWord* word = (ForthWord*)malloc(sizeof(ForthWord));
+    if (!word)
+    {
+        free(name);
+        FORTH_LOG(ctx, "Out of memory\n");
+        return FORTH_FAILURE;
+    }
+    
+    word->next = NULL;
+    if (ctx->words)
+        word->next = ctx->words;
+    ctx->words = word;
+
+    word->name = name;
+    word->name_len = word_name_len;
+    word->fn = NULL;
+    word->cell_offset = ctx->cell_pointer;
+    ctx->state = FORTHI_STATE_COMPILE;
+
+    return FORTH_SUCCESS;
 }
 
 static int forthi_word_colon_no_name(ForthContext* ctx)
@@ -491,8 +738,15 @@ static int forthi_word_colon_no_name(ForthContext* ctx)
 
 static int forthi_word_semicolon(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (ctx->state != FORTHI_STATE_COMPILE)
+    {
+        FORTH_LOG(ctx, "Unexpected ';'\n");
+        return FORTH_FAILURE;
+    }
+
+    forthi_addCompiledReturn(ctx);
+
+    return FORTH_SUCCESS;
 }
 
 static int forthi_word_semicolon_code(ForthContext* ctx)
@@ -3239,10 +3493,10 @@ ForthContext* forth_createContext()
     if (!ctx)
         return NULL;
 
-    ctx->cell_count = DEFAULT_CELL_COUNT;
+    ctx->cell_count = FORTHI_DEFAULT_CELL_COUNT;
     ctx->cells = (ForthCell*)malloc(sizeof(ForthCell) * ctx->cell_count);
 
-    ctx->stack_size = DEFAULT_STACK_SIZE;
+    ctx->stack_size = FORTHI_DEFAULT_STACK_SIZE;
     ctx->stack = (ForthCell*)malloc(sizeof(ForthCell) * ctx->stack_size);
     if (!ctx->stack)
     {
@@ -3294,82 +3548,6 @@ ForthCell* forth_top(ForthContext* ctx, int offset)
     return &ctx->stack[ctx->stack_pointer - offset - 1];
 }
 
-static int forthi_isSpace(char c)
-{
-    return !c || c == ' ' || c == '\t' || c == '\n' || c == '\r';
-}
-
-static const char* forthi_trimCode(const char** code)
-{
-    while (**code && forthi_isSpace(**code))
-        (*code)++;
-
-    return *code;
-}
-
-static const char* forthi_getNextToken(const char** code, size_t* token_len)
-{
-    const char* token_start = forthi_trimCode(code);
-
-    while (**code)
-    {
-        (*code)++;
-        if (forthi_isSpace(**code))
-        {
-            *token_len = *code - token_start;
-            return token_start;
-        }
-    }
-
-    return NULL;
-}
-
-static int forthi_isTokenNumber(const char* token, size_t token_len)
-{
-    if (*token >= '0' && *token <= '9')
-        return 1;
-
-    if (*token == '-' && token_len > 1)
-        if (token[1] >= '0' && token[1] <= '9')
-            return 1;
-
-    return 0;
-}
-
-static ForthWord* forthi_getWord(ForthContext* ctx, const char* name, size_t name_len)
-{
-    auto word = ctx->words;
-
-    while (word)
-    {
-        if (word->name_len == name_len && strncmp(word->name, name, name_len) == 0)
-            return word;
-
-        word = word->next;
-    }
-
-    return NULL;
-}
-
-static int forthi_interpretToken(ForthContext* ctx, const char** code, const char* token, size_t token_len)
-{
-    ForthWord* word = forthi_getWord(ctx, token, token_len);
-    if (word)
-    {
-        if (word->fn)
-            return word->fn(ctx);
-        return FORTH_FAILURE;
-    }
-
-    if (forthi_isTokenNumber(token, token_len))
-    {
-        int64_t number = atoi(token);
-        return forthi_pushIntNumber(ctx, number);
-    }
-
-    return FORTH_FAILURE;
-}
-
 int forth_eval(ForthContext* ctx, const char* code)
 {
     if (!ctx)
@@ -3378,15 +3556,10 @@ int forth_eval(ForthContext* ctx, const char* code)
     if (!code)
         return FORTH_FAILURE;
 
-    const char* token;
-    size_t token_len;
-    while (token = forthi_getNextToken(&code, &token_len))
-    {
-        if (forthi_interpretToken(ctx, &code, token, token_len) == FORTH_FAILURE)
-            return FORTH_FAILURE;
-    }
+    ctx->code = code;
+    ctx->state = FORTHI_STATE_INTERPRET;
 
-    return FORTH_SUCCESS;
+    return forthi_interpret(ctx);
 }
 
 #endif
