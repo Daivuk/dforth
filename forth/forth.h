@@ -3693,7 +3693,6 @@ ForthContext* forth_createContext(int memory_size, int stack_size, int dict_size
         forth_destroyContext(ctx);
         return NULL;
     }
-    ctx->dict_pointer = ctx->dict_size;
 
     if (forthi_defineStandardWords(ctx) == FORTH_FAILURE)
     {
