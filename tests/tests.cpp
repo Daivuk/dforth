@@ -6,6 +6,88 @@
 
 #include "eval_check.h"
 
+TEST_CASE("ForthContext", "[ForthContext]")
+{
+    SECTION("Not enough memory for standard WORDs")
+    {
+        ForthContext* ctx = forth_createContext(100);
+        REQUIRE_FALSE(ctx);
+    }
+
+    SECTION("Dictionnary too small for standard WORDs")
+    {
+        ForthContext* ctx = forth_createContext(-1, -1, 100);
+        REQUIRE_FALSE(ctx);
+    }
+
+    SECTION("Stack overflow")
+    {
+        ForthContext* ctx = forth_createContext(-1, 1);
+
+        evalTestSection(ctx, "1", FORTH_SUCCESS, {1});
+        evalTestSection(ctx, "1 2", FORTH_FAILURE, {1}, "Stack overflow\n");
+
+        forth_destroyContext(ctx);
+    }
+}
+
+// Testing examples and exercices from the book titled "Starting FORTH"
+TEST_CASE("Starting FORTH", "[StartingForth]")
+{
+    ForthContext* ctx = forth_createContext();
+
+    // Chapter 1
+    evalTest(ctx, "15 SPACES", FORTH_SUCCESS, {}, "               ");
+    evalTest(ctx, "42 EMIT", FORTH_SUCCESS, {}, "*");
+    evalTest(ctx, "15 SPACES  42 EMIT  42 EMIT", FORTH_SUCCESS, {}, "               **");
+    evalTest(ctx, ": STAR   42 EMIT ; STAR", FORTH_SUCCESS, {}, "*");
+    evalTest(ctx, "CR", FORTH_SUCCESS, {}, "\n");
+    evalTest(ctx, "CR STAR CR STAR CR STAR", FORTH_SUCCESS, {}, "\n*\n*\n*");
+    evalTest(ctx, ": MARGIN   CR 30 SPACES ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "MARGIN STAR MARGIN STAR MARGIN STAR", FORTH_SUCCESS, {}, "\n                              *\n                              *\n                              *");
+    evalTest(ctx, ": BLIP   MARGIN STAR ;", FORTH_SUCCESS, {});
+    evalTest(ctx, ": STARS   0 DO STAR LOOP ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "5 STARS", FORTH_SUCCESS, {}, "*****");
+    evalTest(ctx, "35 STARS", FORTH_SUCCESS, {}, "***********************************");
+    evalTest(ctx, ": BAR   MARGIN  5 STARS ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "BAR", FORTH_SUCCESS, {}, "\n                              *****");
+    evalTest(ctx, "BAR BLIP BAR BLIP BLIP  CR", FORTH_SUCCESS, {},
+             "\n                              *****"
+             "\n                              *"
+             "\n                              *****"
+             "\n                              *"
+             "\n                              *\n");
+    evalTest(ctx, ": F   BAR BLIP BAR BLIP BLIP  CR ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "F", FORTH_SUCCESS, {},
+             "\n                              *****"
+             "\n                              *"
+             "\n                              *****"
+             "\n                              *"
+             "\n                              *\n");
+    evalTest(ctx, ": GREET   .\" HELLO, I SPEAK FORTH \" ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "GREET", FORTH_SUCCESS, {}, "HELLO, I SPEAK FORTH ");
+    evalTest(ctx, "3 4 + .", FORTH_SUCCESS, {}, "7 ");
+    evalTest(ctx, ": FOUR-MORE   4 + ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "3 FOUR-MORE .", FORTH_SUCCESS, {}, "7 ");
+    evalTest(ctx, "-10 FOUR-MORE .", FORTH_SUCCESS, {}, "-6 ");
+    evalTest(ctx, "2 4 6 8 . . . .", FORTH_SUCCESS, {}, "8 6 4 2 ");
+    evalTest(ctx, "10 20 30 . . . .", FORTH_FAILURE, {}, "30 20 10 Stack underflow\n");
+    // ( 1.)
+    evalTest(ctx, ": GIFT   .\" BOOKENDS\" ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, ": GIVER   .\" STEPHANIE\" ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, ": THANKS   .\" DEAR \" GIVER 44 EMIT CR 4 SPACES .\" THANKS FOR THE \" GIFT 46 EMIT ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "THANKS", FORTH_SUCCESS, {}, "DEAR STEPHANIE,\n    THANKS FOR THE BOOKENDS.");
+    // ( 2.)
+    evalTest(ctx, ": TEN.LESS ( n -- n-10 ) -10 + ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "7 TEN.LESS .", FORTH_SUCCESS, {}, "-3 ");
+    evalTest(ctx, "12 TEN.LESS .", FORTH_SUCCESS, {}, "2 ");
+    // ( 3.)
+    evalTest(ctx, ": GIVER   .\" JOHN\" ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "THANKS", FORTH_SUCCESS, {}, "DEAR STEPHANIE,\n    THANKS FOR THE BOOKENDS.");
+
+    forth_destroyContext(ctx);
+}
+
 TEST_CASE("store", "[store]")
 {
     ForthContext* ctx = forth_createContext();
@@ -55,7 +137,13 @@ TEST_CASE("paren", "[paren]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "(", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "(", FORTH_SUCCESS, {});
+    evalTestSection(ctx, "( )", FORTH_SUCCESS, {});
+    evalTestSection(ctx, "( Comment )", FORTH_SUCCESS, {});
+    evalTestSection(ctx, "( Comment)", FORTH_SUCCESS, {});
+    evalTestSection(ctx, "( Comment) 4 5 +", FORTH_SUCCESS, {9});
+    evalTestSection(ctx, "2 3 + ( Comment) 4 5 +", FORTH_SUCCESS, {5, 9});
+    evalTestSection(ctx, ": foo ( n --  ) . ; 5 foo", FORTH_SUCCESS, {}, "5 ");
 
     forth_destroyContext(ctx);
 }
@@ -225,7 +313,16 @@ TEST_CASE("dot_quote", "[dot_quote]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, ".\"", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "\"", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTestSection(ctx, ".\"", FORTH_SUCCESS, {}, "");
+    evalTestSection(ctx, ".\" Text", FORTH_SUCCESS, {}, "Text");
+    evalTestSection(ctx, ".\" Text\"", FORTH_SUCCESS, {}, "Text");
+    evalTestSection(ctx, "   .\" Text with spaces\"   ", FORTH_SUCCESS, {}, "Text with spaces");
+    evalTestSection(ctx, ".\" Text\" CR", FORTH_SUCCESS, {}, "Text\n");
+    evalTestSection(ctx, ".\" Text\"CR", FORTH_SUCCESS, {}, "Text\n");
+    evalTestSection(ctx, "CR .\" You should see 2345: \".\" 2345\"", FORTH_SUCCESS, {}, "\nYou should see 2345: 2345");
+    evalTestSection(ctx, ": pb1 CR .\" You should see 2345: \".\" 2345\"; pb1", FORTH_SUCCESS, {}, "\nYou should see 2345: 2345");
+    evalTestSection(ctx, ": print-stack-top  CR DUP .\" The top of the stack is \" . CR .\" which looks like '\" DUP EMIT .\" ' in ascii  \" ; 48 print-stack-top", FORTH_SUCCESS, {48}, "\nThe top of the stack is 48 \nwhich looks like '0' in ascii  ");
 
     forth_destroyContext(ctx);
 }
@@ -531,8 +628,8 @@ TEST_CASE("colon", "[colon]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, ": foo 100 + ; 1000 foo", FORTH_SUCCESS, {1100});
-    evalTestSection(ctx, ": foo : bar ; ;", FORTH_FAILURE, {}, "");
-    evalTestSection(ctx, "foo foo1 foo foo2", FORTH_FAILURE, {}, "");
+    evalTestSection(ctx, ": foo : bar ; ;", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTestSection(ctx, "foo foo1 foo foo2", FORTH_FAILURE, {}, "Undefined word\n");
     evalTestSection(ctx, ": GDX 123 ; : GDX GDX 234 ; GDX", FORTH_SUCCESS, {123, 234});
 
     //    forth::eval(ctx, ": print-stack-top  cr dup .\" The top of the stack is \" . cr .\" which looks like '\" dup emit .\" ' in ascii  \" ;");
@@ -1475,7 +1572,11 @@ TEST_CASE("DO", "[DO]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "DO", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "DO", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, ": STARS 0 DO 42 EMIT LOOP ; 5 STARS", FORTH_SUCCESS, {}, "*****");
+    evalTestSection(ctx, ": STARS 0 DO 42 EMIT LOOP ; 5 STARS .\"  <- should see 5 stars\"", FORTH_SUCCESS, {}, "***** <- should see 5 stars");
+    evalTestSection(ctx, ": STARS 0 DO 4 2 DO 42 EMIT LOOP LOOP ; 3 STARS", FORTH_SUCCESS, {}, "******");
+    evalTestSection(ctx, ": STARS 0 DO 42 EMIT LOOP .\" Carrots\"; 5 STARS", FORTH_SUCCESS, {}, "*****Carrots");
 
     forth_destroyContext(ctx);
 }
@@ -1520,7 +1621,9 @@ TEST_CASE("dupe", "[dupe]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "DUP", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "DUP", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 DUP", FORTH_SUCCESS, {1, 1});
+    evalTestSection(ctx, "1 2 DUP", FORTH_SUCCESS, {1, 2, 2});
 
     forth_destroyContext(ctx);
 }
@@ -1678,7 +1781,10 @@ TEST_CASE("EXECUTE", "[EXECUTE]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "EXECUTE", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "EXECUTE", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "-5 EXECUTE", FORTH_FAILURE, {}, "Invalid memory address\n");
+    evalTestSection(ctx, "10000 EXECUTE", FORTH_FAILURE, {}, "Invalid memory address\n");
+    evalTestSection(ctx, "0 EXECUTE", FORTH_FAILURE, {}, "Unimplemented\n");
 
     forth_destroyContext(ctx);
 }
@@ -2767,7 +2873,7 @@ TEST_CASE("LOOP", "[LOOP]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "LOOP", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "LOOP", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
 
     forth_destroyContext(ctx);
 }
@@ -3469,7 +3575,7 @@ TEST_CASE("SPACE", "[SPACE]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "SPACE", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "SPACE", FORTH_SUCCESS, {}, " ");
 
     forth_destroyContext(ctx);
 }
@@ -3478,7 +3584,9 @@ TEST_CASE("SPACES", "[SPACES]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "SPACES", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "0 SPACES", FORTH_SUCCESS, {}, "");
+    evalTestSection(ctx, "-1 SPACES", FORTH_SUCCESS, {}, "");
+    evalTestSection(ctx, "15 SPACES", FORTH_SUCCESS, {}, "               ");
 
     forth_destroyContext(ctx);
 }
