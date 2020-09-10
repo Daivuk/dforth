@@ -189,7 +189,7 @@ int forth_addCWord(ForthContext* ctx, const char* name, forth_c_func fn);
 #define FORTHI_INST_RETURN 0
 #define FORTHI_INST_CALL_C_FUNCTION 1
 #define FORTHI_INST_PUSH_INT_NUMBER 2
-#define FORTHI_INST_WORD_CALL 3
+#define FORTHI_INST_CALL_WORD 3
 #define FORTHI_INST_PRINT_TEXT 4
 #define FORTHI_INST_EXECUTE 5
 
@@ -468,7 +468,7 @@ static int forthi_addWordCallInst(ForthContext* ctx, forth_pointer_type pointer)
     if (forthi_reserveMemorySpace(ctx, sizeof(forth_pointer_type) + 1) == FORTH_FAILURE)
         return FORTH_FAILURE;
 
-    ctx->memory[ctx->memory_pointer++] = FORTHI_INST_WORD_CALL;
+    ctx->memory[ctx->memory_pointer++] = FORTHI_INST_CALL_WORD;
     *(forth_pointer_type*)&ctx->memory[ctx->memory_pointer] = pointer;
     ctx->memory_pointer += (int)sizeof(forth_pointer_type);
 
@@ -1888,25 +1888,21 @@ static int forthi_word_EXECUTE(ForthContext* ctx)
     ctx->program_pointer = (forth_pointer_type)ctx->stack[ctx->stack_pointer].int_value;
     ctx->state = FORTHI_STATE_EXECUTE;
 
-    if (ctx->program_pointer < 0 || ctx->program_pointer >= ctx->memory_pointer)
-    {
-        FORTH_LOG(ctx, "Invalid memory address\n");
-        return FORTH_FAILURE;
-    }
-    uint8_t inst = ctx->memory[ctx->program_pointer++];
-    while (true)
+    while (ctx->return_stack_pointer > 0)
     {
         if (ctx->program_pointer < 0 || ctx->program_pointer >= ctx->memory_pointer)
         {
             FORTH_LOG(ctx, "Invalid memory address\n");
             return FORTH_FAILURE;
         }
+        uint8_t inst = ctx->memory[ctx->program_pointer++];
 
         if (inst == FORTHI_INST_CALL_C_FUNCTION)
         {
             forth_c_func fn = NULL;
             memcpy(&fn, ctx->memory + ctx->program_pointer, sizeof(forth_c_func));
             ctx->program_pointer += sizeof(forth_c_func);
+
             if (fn(ctx) == FORTH_FAILURE)
                 return FORTH_FAILURE;
         }
@@ -1917,23 +1913,17 @@ static int forthi_word_EXECUTE(ForthContext* ctx)
             if (forthi_pushIntNumber(ctx, number) == FORTH_FAILURE)
                 return FORTH_FAILURE;
         }
-        else if (inst == FORTHI_INST_WORD_CALL)
+        else if (inst == FORTHI_INST_CALL_WORD)
         {
             forth_pointer_type pointer = *(forth_pointer_type*)&ctx->memory[ctx->program_pointer];
             ctx->program_pointer += sizeof(forth_pointer_type);
-            forthi_pushIntNumber(ctx, (forth_int_type)pointer);
-            if (forthi_word_EXECUTE(ctx) == FORTH_FAILURE)
+            if (forthi_pushReturnPointer(ctx, ctx->program_pointer) == FORTH_FAILURE)
                 return FORTH_FAILURE;
+            ctx->program_pointer = pointer;
         }
-
-        if (ctx->return_stack_pointer == 0)
-            break;
-
-        inst = ctx->memory[ctx->program_pointer++];
     }
 
     ctx->state = FORTHI_STATE_INTERPRET;
-
     return FORTH_SUCCESS;
 }
 
