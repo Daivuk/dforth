@@ -1,3 +1,27 @@
+/*
+MIT License
+
+Copyright (c) 2020 David St-Louis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 #define CATCH_CONFIG_MAIN
 #include <catch/catch.hpp>
 
@@ -16,7 +40,7 @@ TEST_CASE("ForthContext", "[ForthContext]")
 
     SECTION("Dictionnary too small for standard WORDs")
     {
-        ForthContext* ctx = forth_createContext(-1, -1, 100);
+        ForthContext* ctx = forth_createContext(-1, -1, -1, 100);
         REQUIRE_FALSE(ctx);
     }
 
@@ -84,6 +108,89 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
     // ( 3.)
     evalTest(ctx, ": GIVER   .\" JOHN\" ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "THANKS", FORTH_SUCCESS, {}, "DEAR STEPHANIE,\n    THANKS FOR THE BOOKENDS.");
+    
+    // Chapter 2
+    evalTest(ctx, "17 5 + .", FORTH_SUCCESS, {}, "22 ");
+    evalTest(ctx, "7 8 * .", FORTH_SUCCESS, {}, "56 ");
+    evalTest(ctx, "21 4 / .", FORTH_SUCCESS, {}, "5 ");
+    evalTest(ctx, "17 12 * 4 + .", FORTH_SUCCESS, {}, "208 ");
+    evalTest(ctx, "3 9 + 4 6 + * .", FORTH_SUCCESS, {}, "120 ");
+    evalTest(ctx, ": YARDS>IN   36 * ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, ": FT>IN   12 * ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "10 YARDS>IN .", FORTH_SUCCESS, {}, "360 ");
+    evalTest(ctx, "2 FT>IN .", FORTH_SUCCESS, {}, "24 ");
+    evalTest(ctx, ": YARDS   36 * ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, ": FEET   12 * ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, ": INCHES ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "10 YARDS 2 FEET + 9 INCHES + .", FORTH_SUCCESS, {}, "393 ");
+    evalTest(ctx, ": YARD   YARDS ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, ": FOOT   FEET ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, ": INCH   INCHES ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "1 YARD  2 FEET +  1 INCH + .", FORTH_SUCCESS, {}, "61 ");
+    evalTest(ctx, "2 YARDS  1 FOOT + .", FORTH_SUCCESS, {}, "84 ");
+    evalTest(ctx, "17 20 + 132 + 3 + 9 + .", FORTH_SUCCESS, {}, "181 ");
+    evalTest(ctx, "17 20 132 3 9 + + + + .", FORTH_SUCCESS, {}, "181 ");
+    evalTest(ctx, ": 5#SUM   + + + + ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "17 20 132 3 9 5#SUM .", FORTH_SUCCESS, {}, "181 ");
+    evalTest(ctx, ": FLIGHT-DISTANCE   + * ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "5 600 25 FLIGHT-DISTANCE .", FORTH_SUCCESS, {}, "3125 ");
+    evalTest(ctx, "22 4 /MOD . . ", FORTH_SUCCESS, {}, "5 2 ");
+    evalTest(ctx, ": QUARTERS   4 /MOD . .\" ONES AND \" . .\" QUARTERS \" ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "22 QUARTERS", FORTH_SUCCESS, {}, "5 ONES AND 2 QUARTERS ");
+    evalTest(ctx, "22 4 MOD . ", FORTH_SUCCESS, {}, "2 ");
+    evalTest(ctx, "1 2 . . ", FORTH_SUCCESS, {}, "2 1 ");
+    evalTest(ctx, "1 2 SWAP . . ", FORTH_SUCCESS, {}, "1 2 ");
+    evalTest(ctx, "2 10 4 - SWAP / .", FORTH_SUCCESS, {}, "3 ");
+    //evalTest(ctx, ": MY.S CR 'S SO @ 2- DO I @ . -2 +LOOP ;", FORTH_SUCCESS, {});
+    // ( 1.)
+    evalTest(ctx, ": flip-3-items ( n1 n2 n3 -- n3 n2 n1) SWAP ROT ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "1 2 3 flip-3-items", FORTH_SUCCESS, {3, 2, 1});
+    evalTest(ctx, ". . .", FORTH_SUCCESS, {}, "1 2 3 ");
+    // ( 2.)
+    evalTest(ctx, ": my-over ( n1 n2 -- n1 n2 n1) SWAP DUP ROT SWAP ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "1 2 my-over", FORTH_SUCCESS, {1, 2, 1});
+    evalTest(ctx, ". . .", FORTH_SUCCESS, {}, "1 2 1 ");
+    // ( 3.)
+    evalTest(ctx, ": <ROT ( n1 n2 n3 -- n3 n1 n2) ROT ROT ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "1 2 3 <ROT", FORTH_SUCCESS, {3, 1, 2});
+    evalTest(ctx, ". . .", FORTH_SUCCESS, {}, "2 1 3 ");
+    // ( 4.)
+    evalTest(ctx, ": 2.4 ( n -- result) DUP 1 + SWAP / ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "3 2.4 .", FORTH_SUCCESS, {}, "1 ");
+    // ( 5.)
+    evalTest(ctx, ": 2.5 ( x -- result) DUP 7 * 5 + * ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "3 2.5 .", FORTH_SUCCESS, {}, "78 ");
+    // ( 6.)
+    evalTest(ctx, ": 2.6 ( a b -- result) OVER 9 * SWAP - * ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "2 3 2.6 .", FORTH_SUCCESS, {}, "30 ");
+    // ( F2.)
+    evalTest(ctx, ": 4reverse ( n1 n2 n3 n4 -- n4 n3 n2 n1) SWAP 2SWAP SWAP ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "1 2 3 4 4reverse", FORTH_SUCCESS, {4, 3, 2, 1}, "");
+    evalTest(ctx, "2DROP 2DROP", FORTH_SUCCESS, {}, "");
+    // ( F3.)
+    evalTest(ctx, ": 3DUP ( n1 n2 n3 -- n1 n2 n3 n1 n2 n3) DUP 2OVER ROT ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "1 2 3 3DUP", FORTH_SUCCESS, {1, 2, 3, 1, 2, 3}, "");
+    evalTest(ctx, "2DROP 2DROP 2DROP", FORTH_SUCCESS, {}, "");
+    // ( F4.)
+    evalTest(ctx, ": 2.F4 ( c a b -- result) OVER + * + ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "1 2 3 2.F4 .", FORTH_SUCCESS, {}, "11 ");
+    // ( F5.)
+    evalTest(ctx, ": 2.F5 ( a b -- result) 2DUP - ROT ROT + / ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "1 2 2.F5 .", FORTH_SUCCESS, {}, "-1 ");
+    // ( F6.)
+    evalTest(ctx, ": CONVICTED-OF 0 ;", FORTH_SUCCESS, {});
+    evalTest(ctx, ": ARSON 10 + ;", FORTH_SUCCESS, {});
+    evalTest(ctx, ": HOMICIDE 20 + ;", FORTH_SUCCESS, {});
+    evalTest(ctx, ": BOOKMAKING 2 + ;", FORTH_SUCCESS, {});
+    evalTest(ctx, ": TAX-EVASION 5 + ;", FORTH_SUCCESS, {});
+    evalTest(ctx, ": WILL-SERVE . .\" years\" ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "CONVICTED-OF ARSON HOMICIDE TAX-EVASION", FORTH_SUCCESS, {35}, "");
+    evalTest(ctx, "WILL-SERVE", FORTH_SUCCESS, {}, "35 years");
+    // ( F7.)
+    evalTest(ctx, ": EGG.CARTONS 12 /MOD . .\" cartons and \" . .\" left over\";", FORTH_SUCCESS, {});
+    evalTest(ctx, "53 EGG.CARTONS", FORTH_SUCCESS, {}, "4 cartons and 5 left over");
+
+    // Chapter 3
 
     forth_destroyContext(ctx);
 }
@@ -349,7 +456,12 @@ TEST_CASE("dot_s", "[dot_s]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, ".S", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, ".S", FORTH_SUCCESS, {}, "");
+    evalTestSection(ctx, "1 .S", FORTH_SUCCESS, {1}, "1 ");
+    evalTestSection(ctx, "1 2 .S", FORTH_SUCCESS, {1, 2}, "1 2 ");
+    evalTestSection(ctx, "1 2 3 .S", FORTH_SUCCESS, {1, 2, 3}, "1 2 3 ");
+    evalTestSection(ctx, "1 2 3 4 .S", FORTH_SUCCESS, {1, 2, 3, 4}, "1 2 3 4 ");
+    evalTestSection(ctx, "1 2 3 4 5 .S", FORTH_SUCCESS, {1, 2, 3, 4, 5}, "1 2 3 4 5 ");
 
     forth_destroyContext(ctx);
 }
@@ -386,7 +498,24 @@ TEST_CASE("slash_mod", "[slash_mod]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "/MOD", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "/MOD", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 /MOD", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 /MOD", FORTH_SUCCESS, {1, 2, 0});
+    evalTestSection(ctx, "0 1 /MOD", FORTH_SUCCESS, {0, 0});
+    evalTestSection(ctx, "1 1 /MOD", FORTH_SUCCESS, {0, 1});
+    evalTestSection(ctx, "2 1 /MOD", FORTH_SUCCESS, {0, 2});
+    evalTestSection(ctx, "-1 1 /MOD", FORTH_SUCCESS, {0, -1});
+    evalTestSection(ctx, "-2 1 /MOD", FORTH_SUCCESS, {0, -2});
+    evalTestSection(ctx, "0 -1 /MOD", FORTH_SUCCESS, {0, 0});
+    evalTestSection(ctx, "1 -1 /MOD", FORTH_SUCCESS, {0, -1});
+    evalTestSection(ctx, "2 -1 /MOD", FORTH_SUCCESS, {0, -2});
+    evalTestSection(ctx, "-1 -1 /MOD", FORTH_SUCCESS, {0, 1});
+    evalTestSection(ctx, "-2 -1 /MOD", FORTH_SUCCESS, {0, 2});
+    evalTestSection(ctx, "2 2 /MOD", FORTH_SUCCESS, {0, 1});
+    evalTestSection(ctx, "7 3 /MOD", FORTH_SUCCESS, {1, 2});
+    evalTestSection(ctx, "7 -3 /MOD", FORTH_SUCCESS, {1, -3});
+    evalTestSection(ctx, "-7 3 /MOD", FORTH_SUCCESS, {-1, -3});
+    evalTestSection(ctx, "-7 -3 /MOD", FORTH_SUCCESS, {-1, 2});
 
     forth_destroyContext(ctx);
 }
@@ -537,7 +666,11 @@ TEST_CASE("two_drop", "[two_drop]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "2DROP", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "2DROP", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2DROP", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 2DROP", FORTH_SUCCESS, {});
+    evalTestSection(ctx, "1 2 3 2DROP", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "1 2 3 4 2DROP", FORTH_SUCCESS, {1, 2});
 
     forth_destroyContext(ctx);
 }
@@ -546,7 +679,11 @@ TEST_CASE("two_dupe", "[two_dupe]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "2DUP", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "2DUP", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2DUP", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 2DUP", FORTH_SUCCESS, {1, 2, 1, 2});
+    evalTestSection(ctx, "1 2 3 2DUP", FORTH_SUCCESS, {1, 2, 3, 2, 3});
+    evalTestSection(ctx, "1 2 3 4 2DUP", FORTH_SUCCESS, {1, 2, 3, 4, 3, 4});
 
     forth_destroyContext(ctx);
 }
@@ -564,7 +701,13 @@ TEST_CASE("two_over", "[two_over]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "2OVER", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "2OVER", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2OVER", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 2OVER", FORTH_FAILURE, {1, 2}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 2OVER", FORTH_FAILURE, {1, 2, 3}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 4 2OVER", FORTH_SUCCESS, {1, 2, 3, 4, 1, 2});
+    evalTestSection(ctx, "1 2 3 4 5 2OVER", FORTH_SUCCESS, {1, 2, 3, 4, 5, 2, 3});
+    evalTestSection(ctx, "1 2 3 4 5 6 2OVER", FORTH_SUCCESS, {1, 2, 3, 4, 5, 6, 3, 4});
 
     forth_destroyContext(ctx);
 }
@@ -600,7 +743,13 @@ TEST_CASE("two_swap", "[two_swap]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "2SWAP", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "2SWAP", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2SWAP", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 2SWAP", FORTH_FAILURE, {1, 2}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 2SWAP", FORTH_FAILURE, {1, 2, 3}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 4 2SWAP", FORTH_SUCCESS, {3, 4, 1, 2});
+    evalTestSection(ctx, "1 2 3 4 5 2SWAP", FORTH_SUCCESS, {1, 4, 5, 2, 3});
+    evalTestSection(ctx, "1 2 3 4 5 6 2SWAP", FORTH_SUCCESS, {1, 2, 5, 6, 3, 4});
 
     forth_destroyContext(ctx);
 }
@@ -1594,7 +1743,10 @@ TEST_CASE("DROP", "[DROP]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "DROP", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "DROP", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 DROP", FORTH_SUCCESS, {});
+    evalTestSection(ctx, "1 2 DROP", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "1 2 3 DROP", FORTH_SUCCESS, {1, 2});
 
     forth_destroyContext(ctx);
 }
@@ -1710,6 +1862,20 @@ TEST_CASE("emit_question", "[emit_question]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "EMIT?", FORTH_FAILURE, {}, "Unimplemented\n");
+
+    forth_destroyContext(ctx);
+}
+
+TEST_CASE("EMPTY", "[EMPTY]")
+{
+    ForthContext* ctx = forth_createContext();
+
+    evalTest(ctx, "EMPTY", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, ": foo 100 + ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "20 foo .", FORTH_SUCCESS, {}, "120 ");
+    evalTest(ctx, "EMPTY", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "42 foo .", FORTH_FAILURE, {42}, "Undefined word\n");
+    evalTest(ctx, "EMIT", FORTH_SUCCESS, {}, "*");
 
     forth_destroyContext(ctx);
 }
@@ -2225,7 +2391,7 @@ TEST_CASE("FLUSH", "[FLUSH]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "FLUSH", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "FLUSH", FORTH_FAILURE, {}, "Undefined word\n");
 
     forth_destroyContext(ctx);
 }
@@ -2278,8 +2444,37 @@ TEST_CASE("f_negate", "[f_negate]")
 TEST_CASE("FORGET", "[FORGET]")
 {
     ForthContext* ctx = forth_createContext();
+    
+    evalTest(ctx, "FORGET", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTest(ctx, "FORGET ", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTest(ctx, "FORGET word-that-doesn't-exist", FORTH_FAILURE, {}, "Undefined word\n");
 
-    evalTestSection(ctx, "FORGET", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTest(ctx, ": 3DUP ( n1 n2 n3 -- n1 n2 n3 n1 n2 n3) DUP 2OVER ROT ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "1 2 3 3DUP", FORTH_SUCCESS, {1, 2, 3, 1, 2, 3}, "");
+    evalTest(ctx, "2DROP 2DROP 2DROP", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, ": 2.F4 ( c a b -- result) OVER + * + ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "1 2 3 2.F4 .", FORTH_SUCCESS, {}, "11 ");
+    evalTest(ctx, ": 2.F5 ( a b -- result) 2DUP - ROT ROT + / ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "1 2 2.F5 .", FORTH_SUCCESS, {}, "-1 ");
+    evalTest(ctx, ": CONVICTED-OF 0 ;", FORTH_SUCCESS, {});
+    evalTest(ctx, ": ARSON 10 + ;", FORTH_SUCCESS, {});
+    evalTest(ctx, ": HOMICIDE 20 + ;", FORTH_SUCCESS, {});
+    evalTest(ctx, ": BOOKMAKING 2 + ;", FORTH_SUCCESS, {});
+    evalTest(ctx, ": TAX-EVASION 5 + ;", FORTH_SUCCESS, {});
+    evalTest(ctx, ": WILL-SERVE . .\" years\" ;", FORTH_SUCCESS, {});
+    evalTest(ctx, "CONVICTED-OF ARSON HOMICIDE TAX-EVASION", FORTH_SUCCESS, {35}, "");
+    evalTest(ctx, "WILL-SERVE", FORTH_SUCCESS, {}, "35 years");
+
+    evalTest(ctx, "FORGET CONVICTED-OF", FORTH_SUCCESS, {}, "");
+
+    evalTest(ctx, "CONVICTED-OF", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTest(ctx, "ARSON", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTest(ctx, "HOMICIDE", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTest(ctx, "BOOKMAKING", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTest(ctx, "TAX-EVASION", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTest(ctx, "WILL-SERVE", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTest(ctx, "1 2 2.F5 .", FORTH_SUCCESS, {}, "-1 ");
+    evalTest(ctx, "1 2 3 3DUP", FORTH_SUCCESS, {1, 2, 3, 1, 2, 3}, "");
 
     forth_destroyContext(ctx);
 }
@@ -2837,7 +3032,7 @@ TEST_CASE("LIST", "[LIST]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "LIST", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "LIST", FORTH_FAILURE, {}, "Undefined word\n");
 
     forth_destroyContext(ctx);
 }
@@ -2855,7 +3050,7 @@ TEST_CASE("LOAD", "[LOAD]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "LOAD", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "LOAD", FORTH_FAILURE, {}, "Undefined word\n");
 
     forth_destroyContext(ctx);
 }
@@ -2945,7 +3140,24 @@ TEST_CASE("MOD", "[MOD]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "MOD", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "MOD", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 MOD", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 MOD", FORTH_SUCCESS, {1, 2});
+    evalTestSection(ctx, "0 1 MOD", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 1 MOD", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "2 1 MOD", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "-1 1 MOD", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "-2 1 MOD", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "0 -1 MOD", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 -1 MOD", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "2 -1 MOD", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "-1 -1 MOD", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "-2 -1 MOD", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "2 2 MOD", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "7 3 MOD", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "7 -3 MOD", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "-7 3 MOD", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "-7 -3 MOD", FORTH_SUCCESS, {-1});
 
     forth_destroyContext(ctx);
 }
@@ -3080,7 +3292,10 @@ TEST_CASE("OVER", "[OVER]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "OVER", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "OVER", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 OVER", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 OVER", FORTH_SUCCESS, {1, 2, 1});
+    evalTestSection(ctx, "1 2 3 OVER", FORTH_SUCCESS, {1, 2, 3, 2});
 
     forth_destroyContext(ctx);
 }
@@ -3341,7 +3556,11 @@ TEST_CASE("rote", "[rote]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "ROT", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "ROT", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 ROT", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 ROT", FORTH_FAILURE, {1, 2}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 ROT", FORTH_SUCCESS, {2, 3, 1});
+    evalTestSection(ctx, "1 2 3 4 ROT", FORTH_SUCCESS, {1, 3, 4, 2});
 
     forth_destroyContext(ctx);
 }
@@ -3613,7 +3832,10 @@ TEST_CASE("SWAP", "[SWAP]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "SWAP", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "SWAP", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 SWAP", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 SWAP", FORTH_SUCCESS, {2, 1});
+    evalTestSection(ctx, "1 2 3 SWAP", FORTH_SUCCESS, {1, 3, 2});
 
     forth_destroyContext(ctx);
 }
@@ -3856,7 +4078,20 @@ TEST_CASE("WITHIN", "[WITHIN]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "WITHIN", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "WITHIN", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 WITHIN", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 WITHIN", FORTH_FAILURE, {1, 2}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 WITHIN", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 2 3 4 WITHIN", FORTH_SUCCESS, {1, 0});
+    evalTestSection(ctx, "2 1 3 WITHIN", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "2 3 1 WITHIN", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "3 1 2 WITHIN", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 1 3 WITHIN", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "3 1 3 WITHIN", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "0 -3 3 WITHIN", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "-3 -3 3 WITHIN", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "-2 -3 -1 WITHIN", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "-1 -3 -1 WITHIN", FORTH_SUCCESS, {0});
 
     forth_destroyContext(ctx);
 }
