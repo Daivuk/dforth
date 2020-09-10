@@ -802,7 +802,7 @@ TEST_CASE("semicolon", "[semicolon]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, ";", FORTH_FAILURE, {}, "Unexpected ';'\n");
+    evalTestSection(ctx, ";", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
 
     forth_destroyContext(ctx);
 }
