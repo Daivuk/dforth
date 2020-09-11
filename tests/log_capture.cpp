@@ -67,7 +67,7 @@ std::string vformat(const char *fmt, va_list ap)
     }
 }
 
-static int on_log(ForthContext* ctx, const char* fmt, ...)
+static int on_log(forth_context* ctx, const char* fmt, ...)
 {
     va_list ap;
     va_start (ap, fmt);
@@ -79,7 +79,7 @@ static int on_log(ForthContext* ctx, const char* fmt, ...)
     return (int)buf.size();
 }
 
-LogCapturer::LogCapturer(ForthContext* ctx)
+LogCapturer::LogCapturer(forth_context* ctx)
 {
     log.clear();
     ss.clear();

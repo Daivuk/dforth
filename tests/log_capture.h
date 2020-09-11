@@ -26,12 +26,12 @@ SOFTWARE.
 
 #include <string>
 
-struct ForthContext;
+struct forth_context;
 
 class LogCapturer final
 {
 public:
-    LogCapturer(ForthContext* ctx);
+    LogCapturer(forth_context* ctx);
 
     static std::string log;
 };

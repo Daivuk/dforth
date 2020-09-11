@@ -31,7 +31,7 @@ SOFTWARE.
 
 #include "log_capture.h"
 
-void evalTestSection(ForthContext* ctx,
+void evalTestSection(forth_context* ctx,
                      const char* eval_expression,
                      int expected_result,
                      const std::vector<int64_t>& expected_stack,
@@ -52,7 +52,7 @@ void evalTestSection(ForthContext* ctx,
         REQUIRE(ctx->stack_pointer == (int)expected_stack.size());
         for (int i = 0, len = (int)expected_stack.size(); i < len; i++)
         {
-            auto top = forth_top(ctx, len - i - 1);
+            auto top = forth_get_top(ctx, len - i - 1);
             if (top && top->int_value != expected_stack[i])
             {
                 failed = true;
@@ -76,7 +76,7 @@ void evalTestSection(ForthContext* ctx,
     }
 }
 
-void evalTest(ForthContext* ctx, 
+void evalTest(forth_context* ctx, 
               const char* eval_expression,
               int expected_result,
               const std::vector<int64_t>& expected_stack,
@@ -98,7 +98,7 @@ void evalTest(ForthContext* ctx,
         REQUIRE(ctx->stack_pointer == (int)expected_stack.size());
         for (int i = 0, len = (int)expected_stack.size(); i < len; i++)
         {
-            auto top = forth_top(ctx, len - i - 1);
+            auto top = forth_get_top(ctx, len - i - 1);
             if (top && top->int_value != expected_stack[i])
             {
                 failed = true;
