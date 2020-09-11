@@ -163,9 +163,9 @@ typedef struct forth_context
 //  return_stack_size   : in pointer count
 //  dict_size           : Dictionnary size, in word count
 forth_context* forth_create_context(int memory_size       = FORTH_MEM_INFINITE,
-                                   int stack_size        = FORTH_MEM_INFINITE,
-                                   int return_stack_size = FORTH_MEM_INFINITE,
-                                   int dict_size         = FORTH_MEM_INFINITE);
+                                    int stack_size        = FORTH_MEM_INFINITE,
+                                    int return_stack_size = FORTH_MEM_INFINITE,
+                                    int dict_size         = FORTH_MEM_INFINITE);
 
 // Destroy a context
 void forth_destroy_context(forth_context* ctx);
@@ -346,11 +346,13 @@ static int forthi_grow_dictionnary(forth_context* ctx)
     char* new_names = (char*)malloc((ctx->dict_size + FORTHI_MEM_ALLOC_CHUNK_SIZE) * FORTH_DICT_CHAR_COUNT);
     if (!new_names)
         return FORTH_FAILURE;
-    memcpy(new_names + FORTHI_MEM_ALLOC_CHUNK_SIZE * FORTH_DICT_CHAR_COUNT, ctx->dict_names, ctx->dict_size * FORTH_DICT_CHAR_COUNT);
+    memcpy(new_names + FORTHI_MEM_ALLOC_CHUNK_SIZE * FORTH_DICT_CHAR_COUNT, 
+        ctx->dict_names, ctx->dict_size * FORTH_DICT_CHAR_COUNT);
     free(ctx->dict_names);
     ctx->dict_names = new_names;
 
-    forth_pointer* new_pointers = (forth_pointer*)malloc((ctx->dict_size + FORTHI_MEM_ALLOC_CHUNK_SIZE) * sizeof(forth_pointer));
+    forth_pointer* new_pointers = 
+        (forth_pointer*)malloc((ctx->dict_size + FORTHI_MEM_ALLOC_CHUNK_SIZE) * sizeof(forth_pointer));
     if (!new_pointers)
         return FORTH_FAILURE;
     memcpy(new_pointers + FORTHI_MEM_ALLOC_CHUNK_SIZE, ctx->dict_pointers, ctx->dict_size * sizeof(forth_pointer));
@@ -4418,7 +4420,10 @@ forth_context* forth_create_context(int memory_size, int stack_size, int return_
     memset(ctx, 0, sizeof(forth_context));
 
     ctx->memory_auto_resize = memory_size == FORTH_MEM_INFINITE ? 1 : 0;
-    ctx->memory_size = ctx->memory_auto_resize ? (436 * (sizeof(forth_c_func) + 2) / FORTHI_MEM_ALLOC_CHUNK_SIZE * FORTHI_MEM_ALLOC_CHUNK_SIZE + FORTHI_MEM_ALLOC_CHUNK_SIZE) : memory_size;
+    ctx->memory_size = ctx->memory_auto_resize 
+        ? (436 * (sizeof(forth_c_func) + 2) / FORTHI_MEM_ALLOC_CHUNK_SIZE * FORTHI_MEM_ALLOC_CHUNK_SIZE + 
+            FORTHI_MEM_ALLOC_CHUNK_SIZE) 
+        : memory_size;
     ctx->memory = (uint8_t*)malloc(ctx->memory_size);
     if (!ctx->memory)
     {
