@@ -268,6 +268,7 @@ static int forthi_interpret(ForthContext* ctx);
 int forth_eval(ForthContext* ctx, const char* code);
 
 // Standard words (Only those requiring forward declaration)
+static int forthi_word_abort_quote(ForthContext* ctx);
 static int forthi_word_dot_quote(ForthContext* ctx);
 static int forthi_word_ELSE(ForthContext* ctx);
 static int forthi_word_EXECUTE(ForthContext* ctx);
@@ -624,7 +625,8 @@ static int forthi_compileFunctionCall(ForthContext* ctx, forth_c_func fn)
 
     // Special cases for functions that need to allocate more memory,
     // call them at compile time
-    if (fn == forthi_word_dot_quote ||
+    if (fn == forthi_word_abort_quote ||
+        fn == forthi_word_dot_quote ||
         fn == forthi_word_semicolon ||
         fn == forthi_word_IF ||
         fn == forthi_word_ELSE ||
@@ -1435,14 +1437,59 @@ static int forthi_word_fetch(ForthContext* ctx)
 
 static int forthi_word_ABORT(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int_type number = ctx->stack[ctx->stack_pointer].int_value;
+    if (number != FORTH_FALSE)
+        return FORTH_FAILURE;
+
+    return FORTH_SUCCESS;
 }
 
 static int forthi_word_abort_quote(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (ctx->state == FORTHI_STATE_INTERPRET)
+    {
+        FORTH_LOG(ctx, "Interpreting a compile-only word\n");
+        return FORTH_FAILURE;
+    }
+
+    if (ctx->state == FORTHI_STATE_EXECUTE)
+    {
+        if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        forth_int_type number = ctx->stack[ctx->stack_pointer].int_value;
+        if (number == FORTH_FALSE)
+            return FORTH_SUCCESS;
+
+        forth_int_type len;
+        const char* text = forthi_readText(ctx, &len);
+        if (text == NULL)
+            return FORTH_FAILURE;
+
+        FORTH_LOG(ctx, "%.*s", (unsigned int)len, text);
+        return FORTH_FAILURE;
+    }
+
+    if (*ctx->code)
+        ctx->code++;
+
+    const char* string_start = ctx->code;
+    const char* string_end = forthi_readUntil(ctx, '\"');
+
+    if (*ctx->code)
+        ctx->code++;
+
+    size_t len = string_end - string_start;
+
+    if (ctx->state == FORTHI_STATE_COMPILE)
+        return forthi_writeText(ctx, string_start, len);
+
+    FORTH_LOG(ctx, "%.*s", (unsigned int)len, string_start);
+
+    return FORTH_SUCCESS;
 }
 
 static int forthi_word_abs(ForthContext* ctx)
@@ -3536,8 +3583,14 @@ static int forthi_word_THEN(ForthContext* ctx)
 
 static int forthi_word_THROW(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int_type number = ctx->stack[ctx->stack_pointer].int_value;
+    if (number != FORTH_FALSE)
+        return FORTH_FAILURE;
+
+    return FORTH_SUCCESS;
 }
 
 static int forthi_word_THRU(ForthContext* ctx)

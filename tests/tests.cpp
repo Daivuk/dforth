@@ -226,6 +226,13 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
     evalTest(ctx, "1 -1 + .", FORTH_SUCCESS, {}, "0 ");
     evalTest(ctx, ": BOXTEST ( length width height -- ) 6 > ROT 22 > ROT 19 > AND AND IF .\" BIG ENOUGH \" THEN ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "23 20 7 BOXTEST", FORTH_SUCCESS, {}, "BIG ENOUGH ");
+    evalTest(ctx, ": /CHECK DUP 0= ABORT\" ZERO DENOMINATOR \" / ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "8 0 /CHECK", FORTH_FAILURE, {}, "ZERO DENOMINATOR ");
+    evalTest(ctx, ": ENVELOPE /CHECK .\" THE ANSWER IS \" . ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "8 4 ENVELOPE", FORTH_SUCCESS, {}, "THE ANSWER IS 2 ");
+    evalTest(ctx, "8 0 ENVELOPE", FORTH_FAILURE, {}, "ZERO DENOMINATOR ");
+
+    // Chapter 5
 
     forth_destroyContext(ctx);
 }
@@ -1031,7 +1038,11 @@ TEST_CASE("ABORT", "[ABORT]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "ABORT", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "ABORT", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "0 ABORT", FORTH_SUCCESS, {}, "");
+    evalTestSection(ctx, "1 ABORT", FORTH_FAILURE, {}, "");
+    evalTestSection(ctx, "1 0 ABORT", FORTH_SUCCESS, {1}, "");
+    evalTestSection(ctx, "1 2 3 ABORT", FORTH_FAILURE, {}, "");
 
     forth_destroyContext(ctx);
 }
@@ -1040,7 +1051,11 @@ TEST_CASE("abort_quote", "[abort_quote]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "ABORT\"", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "ABORT\"", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, "ABORT\" error message\n\"", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, ": foo ABORT\" error message\n\" ; 1 foo", FORTH_FAILURE, {}, "error message\n");
+    evalTestSection(ctx, ": foo ABORT\" error message\n\" ; 0 foo", FORTH_SUCCESS, {}, "");
+    evalTestSection(ctx, ": foo ABORT\" ; foo", FORTH_SUCCESS, {}, "");
 
     forth_destroyContext(ctx);
 }
@@ -3940,7 +3955,13 @@ TEST_CASE("THROW", "[THROW]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "THROW", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "THROW", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 THROW", FORTH_FAILURE, {}, "");
+    evalTestSection(ctx, "1 2 THROW", FORTH_FAILURE, {}, "");
+    evalTestSection(ctx, "-1 THROW", FORTH_FAILURE, {}, "");
+    evalTestSection(ctx, "0 THROW", FORTH_SUCCESS, {}, "");
+    evalTestSection(ctx, "1 0 THROW", FORTH_SUCCESS, {1}, "");
+    evalTestSection(ctx, "1 2 0 THROW", FORTH_SUCCESS, {1, 2}, "");
 
     forth_destroyContext(ctx);
 }
