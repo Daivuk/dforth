@@ -49,7 +49,7 @@ TEST_CASE("ForthContext", "[ForthContext]")
         ForthContext* ctx = forth_createContext(-1, 1);
 
         evalTestSection(ctx, "1", FORTH_SUCCESS, {1});
-        evalTestSection(ctx, "1 2", FORTH_FAILURE, {1}, "Stack overflow\n");
+        evalTestSection(ctx, "1 2", FORTH_FAILURE, {}, "Stack overflow\n");
 
         forth_destroyContext(ctx);
     }
@@ -191,6 +191,41 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
     evalTest(ctx, "53 EGG.CARTONS", FORTH_SUCCESS, {}, "4 cartons and 5 left over");
 
     // Chapter 3
+    // ... Editor stuff, not relevant
+
+    // Chapter 4
+    evalTest(ctx, ": ?FULL 12 = IF .\" It's full \" THEN ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "11 ?FULL", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "12 ?FULL", FORTH_SUCCESS, {}, "It's full ");
+    evalTest(ctx, ": ?TOO-HOT 220 > IF .\" DANGER -- Reduce heat \" THEN  ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "290 ?TOO-HOT", FORTH_SUCCESS, {}, "DANGER -- Reduce heat ");
+    evalTest(ctx, "130 ?TOO-HOT", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, ": EGGSIZE DUP 18 < IF .\" REJECT \"       ELSE"
+                  "          DUP 21 < IF .\" SMALL \"        ELSE"
+                  "          DUP 24 < IF .\" MEDIUM \"       ELSE"
+                  "          DUP 27 < IF .\" LARGE \"        ELSE"
+                  "          DUP 30 < IF .\" EXTRA LARGE \"  ELSE"
+                  "                      .\" ERROR \"  "
+                  "              THEN THEN THEN THEN THEN  DROP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "16 EGGSIZE", FORTH_SUCCESS, {}, "REJECT ");
+    evalTest(ctx, "20 EGGSIZE", FORTH_SUCCESS, {}, "SMALL ");
+    evalTest(ctx, "22 EGGSIZE", FORTH_SUCCESS, {}, "MEDIUM ");
+    evalTest(ctx, "25 EGGSIZE", FORTH_SUCCESS, {}, "LARGE ");
+    evalTest(ctx, "28 EGGSIZE", FORTH_SUCCESS, {}, "EXTRA LARGE ");
+    evalTest(ctx, "31 EGGSIZE", FORTH_SUCCESS, {}, "ERROR ");
+    evalTest(ctx, "0 NOT .", FORTH_SUCCESS, {}, "-1 ");
+    evalTest(ctx, "-1 NOT .", FORTH_SUCCESS, {}, "0 ");
+    evalTest(ctx, ": VEGETABLE DUP 0< SWAP 10 MOD 0= + IF .\" ARTICHOKE \" THEN ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, ": ?DAY DUP 1 < SWAP 31 > + IF .\" NO WAY \" ELSE .\" THANK YOU \" THEN ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "-2 ?DAY", FORTH_SUCCESS, {}, "NO WAY ");
+    evalTest(ctx, "0 ?DAY", FORTH_SUCCESS, {}, "NO WAY ");
+    evalTest(ctx, "1 ?DAY", FORTH_SUCCESS, {}, "THANK YOU ");
+    evalTest(ctx, "31 ?DAY", FORTH_SUCCESS, {}, "THANK YOU ");
+    evalTest(ctx, "32 ?DAY", FORTH_SUCCESS, {}, "NO WAY ");
+    evalTest(ctx, "39 ?DAY", FORTH_SUCCESS, {}, "NO WAY ");
+    evalTest(ctx, "1 -1 + .", FORTH_SUCCESS, {}, "0 ");
+    evalTest(ctx, ": BOXTEST ( length width height -- ) 6 > ROT 22 > ROT 19 > AND AND IF .\" BIG ENOUGH \" THEN ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "23 20 7 BOXTEST", FORTH_SUCCESS, {}, "BIG ENOUGH ");
 
     forth_destroyContext(ctx);
 }
@@ -269,7 +304,7 @@ TEST_CASE("star", "[star]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "*", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 *", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 *", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 3 *", FORTH_SUCCESS, {1, 6});
     evalTestSection(ctx, "0 0 *", FORTH_SUCCESS, {0});
     evalTestSection(ctx, "1 0 *", FORTH_SUCCESS, {0});
@@ -306,7 +341,7 @@ TEST_CASE("plus", "[plus]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "+", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 +", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 +", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 3 +", FORTH_SUCCESS, {1, 5});
     evalTestSection(ctx, "0 5 +", FORTH_SUCCESS, {5});
     evalTestSection(ctx, "5 0 +", FORTH_SUCCESS, {5});
@@ -371,7 +406,7 @@ TEST_CASE("minus", "[minus]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "-", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 -", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 -", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 3 -", FORTH_SUCCESS, {1, -1});
     evalTestSection(ctx, "0 5 -", FORTH_SUCCESS, {-5});
     evalTestSection(ctx, "5 0 -", FORTH_SUCCESS, {5});
@@ -471,7 +506,7 @@ TEST_CASE("slash", "[slash]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "/", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 /", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 /", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 3 /", FORTH_SUCCESS, {1, 0});
     evalTestSection(ctx, "0 1 /", FORTH_SUCCESS, {0});
     evalTestSection(ctx, "1 1 /", FORTH_SUCCESS, {1});
@@ -499,7 +534,7 @@ TEST_CASE("slash_mod", "[slash_mod]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "/MOD", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 /MOD", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 /MOD", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 3 /MOD", FORTH_SUCCESS, {1, 2, 0});
     evalTestSection(ctx, "0 1 /MOD", FORTH_SUCCESS, {0, 0});
     evalTestSection(ctx, "1 1 /MOD", FORTH_SUCCESS, {0, 1});
@@ -667,7 +702,7 @@ TEST_CASE("two_drop", "[two_drop]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "2DROP", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 2DROP", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2DROP", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 2DROP", FORTH_SUCCESS, {});
     evalTestSection(ctx, "1 2 3 2DROP", FORTH_SUCCESS, {1});
     evalTestSection(ctx, "1 2 3 4 2DROP", FORTH_SUCCESS, {1, 2});
@@ -680,7 +715,7 @@ TEST_CASE("two_dupe", "[two_dupe]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "2DUP", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 2DUP", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2DUP", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 2DUP", FORTH_SUCCESS, {1, 2, 1, 2});
     evalTestSection(ctx, "1 2 3 2DUP", FORTH_SUCCESS, {1, 2, 3, 2, 3});
     evalTestSection(ctx, "1 2 3 4 2DUP", FORTH_SUCCESS, {1, 2, 3, 4, 3, 4});
@@ -702,9 +737,9 @@ TEST_CASE("two_over", "[two_over]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "2OVER", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 2OVER", FORTH_FAILURE, {1}, "Stack underflow\n");
-    evalTestSection(ctx, "1 2 2OVER", FORTH_FAILURE, {1, 2}, "Stack underflow\n");
-    evalTestSection(ctx, "1 2 3 2OVER", FORTH_FAILURE, {1, 2, 3}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2OVER", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 2OVER", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 2OVER", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 3 4 2OVER", FORTH_SUCCESS, {1, 2, 3, 4, 1, 2});
     evalTestSection(ctx, "1 2 3 4 5 2OVER", FORTH_SUCCESS, {1, 2, 3, 4, 5, 2, 3});
     evalTestSection(ctx, "1 2 3 4 5 6 2OVER", FORTH_SUCCESS, {1, 2, 3, 4, 5, 6, 3, 4});
@@ -744,9 +779,9 @@ TEST_CASE("two_swap", "[two_swap]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "2SWAP", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 2SWAP", FORTH_FAILURE, {1}, "Stack underflow\n");
-    evalTestSection(ctx, "1 2 2SWAP", FORTH_FAILURE, {1, 2}, "Stack underflow\n");
-    evalTestSection(ctx, "1 2 3 2SWAP", FORTH_FAILURE, {1, 2, 3}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2SWAP", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 2SWAP", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 2SWAP", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 3 4 2SWAP", FORTH_SUCCESS, {3, 4, 1, 2});
     evalTestSection(ctx, "1 2 3 4 5 2SWAP", FORTH_SUCCESS, {1, 4, 5, 2, 3});
     evalTestSection(ctx, "1 2 3 4 5 6 2SWAP", FORTH_SUCCESS, {1, 2, 5, 6, 3, 4});
@@ -821,7 +856,7 @@ TEST_CASE("less_than", "[less_than]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "<", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 <", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 <", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 <", FORTH_SUCCESS, {-1});
     evalTestSection(ctx, "1 2 3 <", FORTH_SUCCESS, {1, -1});
     evalTestSection(ctx, "0 1 <", FORTH_SUCCESS, {-1});
@@ -852,7 +887,7 @@ TEST_CASE("not_equals", "[not_equals]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "<>", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 <>", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 <>", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 <>", FORTH_SUCCESS, {-1});
     evalTestSection(ctx, "1 2 3 <>", FORTH_SUCCESS, {1, -1});
     evalTestSection(ctx, "0 0 <>", FORTH_SUCCESS, {0}, "");
@@ -871,7 +906,7 @@ TEST_CASE("equals", "[equals]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "=", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 =", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 =", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 =", FORTH_SUCCESS, {0});
     evalTestSection(ctx, "1 2 3 =", FORTH_SUCCESS, {1, 0});
     evalTestSection(ctx, "0 0 =", FORTH_SUCCESS, {-1}, "");
@@ -890,7 +925,7 @@ TEST_CASE("greater_than", "[greater_than]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, ">", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 >", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 >", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 >", FORTH_SUCCESS, {0});
     evalTestSection(ctx, "1 2 3 >", FORTH_SUCCESS, {1, 0});
     evalTestSection(ctx, "0 1 >", FORTH_SUCCESS, {0});
@@ -974,7 +1009,11 @@ TEST_CASE("question_dupe", "[question_dupe]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "?DUP", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "?DUP", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "-1 ?DUP", FORTH_SUCCESS, {-1, -1});
+    evalTestSection(ctx, "0 ?DUP", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 ?DUP", FORTH_SUCCESS, {1, 1});
+    evalTestSection(ctx, "1 2 ?DUP", FORTH_SUCCESS, {1, 2, 2});
 
     forth_destroyContext(ctx);
 }
@@ -1100,7 +1139,14 @@ TEST_CASE("AND", "[AND]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "AND", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "AND", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 AND", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 AND", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 2 3 AND", FORTH_SUCCESS, {1, 2});
+    evalTestSection(ctx, "0 0 AND", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "0 1 AND", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 0 AND", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 1 AND", FORTH_SUCCESS, {1});
 
     forth_destroyContext(ctx);
 }
@@ -1838,7 +1884,16 @@ TEST_CASE("ELSE", "[ELSE]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "ELSE", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "ELSE", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, "1 ELSE", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, ": foo IF ELSE THEN ; foo", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, ": foo IF ELSE THEN ; 1 foo", FORTH_SUCCESS, {}, "");
+    evalTestSection(ctx, ": foo IF .\" true \" ELSE .\" false \" THEN .\" then\" ; 0 foo", FORTH_SUCCESS, {}, "false then");
+    evalTestSection(ctx, ": foo IF .\" true \" ELSE .\" false \" THEN .\" then\" ; 1 foo", FORTH_SUCCESS, {}, "true then");
+    evalTestSection(ctx, ": foo IF .\" if1 \" ELSE .\" else1 \" IF .\" if2 \" ELSE .\" else2 \" THEN .\" then2 \" THEN .\" then1\" ; 0 0 foo", FORTH_SUCCESS, {}, "else1 else2 then2 then1");
+    evalTestSection(ctx, ": foo IF .\" if1 \" ELSE .\" else1 \" IF .\" if2 \" ELSE .\" else2 \" THEN .\" then2 \" THEN .\" then1\" ; 0 1 foo", FORTH_SUCCESS, {0}, "if1 then1");
+    evalTestSection(ctx, ": foo IF .\" if1 \" ELSE .\" else1 \" IF .\" if2 \" ELSE .\" else2 \" THEN .\" then2 \" THEN .\" then1\" ; 1 0 foo", FORTH_SUCCESS, {}, "else1 if2 then2 then1");
+    evalTestSection(ctx, ": foo IF .\" if1 \" ELSE .\" else1 \" IF .\" if2 \" ELSE .\" else2 \" THEN .\" then2 \" THEN .\" then1\" ; 1 1 foo", FORTH_SUCCESS, {1}, "if1 then1");
 
     forth_destroyContext(ctx);
 }
@@ -1874,8 +1929,8 @@ TEST_CASE("EMPTY", "[EMPTY]")
     evalTest(ctx, ": foo 100 + ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "20 foo .", FORTH_SUCCESS, {}, "120 ");
     evalTest(ctx, "EMPTY", FORTH_SUCCESS, {}, "");
-    evalTest(ctx, "42 foo .", FORTH_FAILURE, {42}, "Undefined word\n");
-    evalTest(ctx, "EMIT", FORTH_SUCCESS, {}, "*");
+    evalTest(ctx, "42 foo .", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTest(ctx, "EMIT", FORTH_FAILURE, {}, "Stack underflow\n");
 
     forth_destroyContext(ctx);
 }
@@ -2708,7 +2763,12 @@ TEST_CASE("IF", "[IF]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "IF", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "IF", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, "1 IF", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, ": foo IF THEN ; foo", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, ": foo IF THEN ; 1 foo", FORTH_SUCCESS, {}, "");
+    evalTestSection(ctx, ": foo IF .\" true \" THEN .\" then\" ; 0 foo", FORTH_SUCCESS, {}, "then");
+    evalTestSection(ctx, ": foo IF .\" true \" THEN .\" then\" ; 1 foo", FORTH_SUCCESS, {}, "true then");
 
     forth_destroyContext(ctx);
 }
@@ -3141,7 +3201,7 @@ TEST_CASE("MOD", "[MOD]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "MOD", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 MOD", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 MOD", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 3 MOD", FORTH_SUCCESS, {1, 2});
     evalTestSection(ctx, "0 1 MOD", FORTH_SUCCESS, {0});
     evalTestSection(ctx, "1 1 MOD", FORTH_SUCCESS, {0});
@@ -3274,7 +3334,15 @@ TEST_CASE("OR", "[OR]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "OR", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "OR", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 OR", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 OR", FORTH_SUCCESS, {3});
+    evalTestSection(ctx, "1 2 3 OR", FORTH_SUCCESS, {1, 3});
+    evalTestSection(ctx, "0 0 OR", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "0 1 OR", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "1 0 OR", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "1 1 OR", FORTH_SUCCESS, {1});
+
 
     forth_destroyContext(ctx);
 }
@@ -3293,7 +3361,7 @@ TEST_CASE("OVER", "[OVER]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "OVER", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 OVER", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 OVER", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 OVER", FORTH_SUCCESS, {1, 2, 1});
     evalTestSection(ctx, "1 2 3 OVER", FORTH_SUCCESS, {1, 2, 3, 2});
 
@@ -3557,8 +3625,8 @@ TEST_CASE("rote", "[rote]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "ROT", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 ROT", FORTH_FAILURE, {1}, "Stack underflow\n");
-    evalTestSection(ctx, "1 2 ROT", FORTH_FAILURE, {1, 2}, "Stack underflow\n");
+    evalTestSection(ctx, "1 ROT", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 ROT", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 3 ROT", FORTH_SUCCESS, {2, 3, 1});
     evalTestSection(ctx, "1 2 3 4 ROT", FORTH_SUCCESS, {1, 3, 4, 2});
 
@@ -3833,7 +3901,7 @@ TEST_CASE("SWAP", "[SWAP]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "SWAP", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 SWAP", FORTH_FAILURE, {1}, "Stack underflow\n");
+    evalTestSection(ctx, "1 SWAP", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 SWAP", FORTH_SUCCESS, {2, 1});
     evalTestSection(ctx, "1 2 3 SWAP", FORTH_SUCCESS, {1, 3, 2});
 
@@ -3862,7 +3930,8 @@ TEST_CASE("THEN", "[THEN]")
 {
     ForthContext* ctx = forth_createContext();
 
-    evalTestSection(ctx, "THEN", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "THEN", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, "1 THEN", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
 
     forth_destroyContext(ctx);
 }
@@ -4079,8 +4148,8 @@ TEST_CASE("WITHIN", "[WITHIN]")
     ForthContext* ctx = forth_createContext();
 
     evalTestSection(ctx, "WITHIN", FORTH_FAILURE, {}, "Stack underflow\n");
-    evalTestSection(ctx, "1 WITHIN", FORTH_FAILURE, {1}, "Stack underflow\n");
-    evalTestSection(ctx, "1 2 WITHIN", FORTH_FAILURE, {1, 2}, "Stack underflow\n");
+    evalTestSection(ctx, "1 WITHIN", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 WITHIN", FORTH_FAILURE, {}, "Stack underflow\n");
     evalTestSection(ctx, "1 2 3 WITHIN", FORTH_SUCCESS, {0});
     evalTestSection(ctx, "1 2 3 4 WITHIN", FORTH_SUCCESS, {1, 0});
     evalTestSection(ctx, "2 1 3 WITHIN", FORTH_SUCCESS, {-1});

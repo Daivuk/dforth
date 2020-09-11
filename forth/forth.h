@@ -58,6 +58,10 @@ SOFTWARE.
 // word_count * (FORTH_DICT_CHAR_COUNT + sizeof(forth_pointer_type) + 1)
 //
 //---------------------------------------------------------------------------
+// In this file, public API constants, typdefs, structs and functions
+// start with FORTH. Internal with FORTHI, the I stands for "internal".
+//
+//---------------------------------------------------------------------------
 
 #ifndef FORTH_H_INCLUDED
 #define FORTH_H_INCLUDED
@@ -76,6 +80,9 @@ extern "C"
 
 #define FORTH_FAILURE 0
 #define FORTH_SUCCESS 1
+#define FORTH_MEM_INFINITE -1
+#define FORTH_FALSE 0
+#define FORTH_TRUE -1
 
 #if DFORTH_POINTER_SIZE_8_BITS
 typedef uint8_t forth_pointer_type;
@@ -90,17 +97,13 @@ typedef uint32_t forth_pointer_type;
 
 #if FORTH_INT_SIZE_8_BITS
 typedef int8_t forth_int_type;
-#define FORTHI_CHAR_PRINT_CODE PRId8
 #elif FORTH_INT_SIZE_16_BITS
 typedef int16_t forth_int_type;
-#define FORTHI_CHAR_PRINT_CODE PRId16
 #elif FORTH_INT_SIZE_32_BITS
 typedef int32_t forth_int_type;
-#define FORTHI_CHAR_PRINT_CODE PRId32
 #else
 #define FORTH_INT_SIZE_64_BITS 1
 typedef int64_t forth_int_type;
-#define FORTHI_CHAR_PRINT_CODE PRId64
 #endif
 
 #ifndef FORTH_DICT_CHAR_COUNT
@@ -125,7 +128,6 @@ typedef struct ForthContext
     uint8_t memory_auto_resize;
     forth_pointer_type memory_pointer;
     forth_pointer_type program_pointer;
-    forth_pointer_type return_from;
 
     ForthCell* stack;
     int stack_size;
@@ -151,14 +153,14 @@ typedef struct ForthContext
 } ForthContext;
 
 // Create a context. Returns NULL if failed to create
-//  memory_size         : in bytes. -1 for infinite
-//  stack_size          : in cell count. -1 for infinite
-//  return_stack_size   : in pointer count. -1 for infinite
-//  dict_size           : Dictionnary size, in word count. -1 for infinite
-ForthContext* forth_createContext(int memory_size = -1,
-                                  int stack_size = -1,
-                                  int return_stack_size = -1,
-                                  int dict_size = -1);
+//  memory_size         : in bytes
+//  stack_size          : in cell count
+//  return_stack_size   : in pointer count
+//  dict_size           : Dictionnary size, in word count
+ForthContext* forth_createContext(int memory_size       = FORTH_MEM_INFINITE,
+                                  int stack_size        = FORTH_MEM_INFINITE,
+                                  int return_stack_size = FORTH_MEM_INFINITE,
+                                  int dict_size         = FORTH_MEM_INFINITE);
 
 // Destroy a context
 void forth_destroyContext(ForthContext* ctx);
@@ -180,11 +182,11 @@ int forth_addCWord(ForthContext* ctx, const char* name, forth_c_func fn);
 
 #include <math.h>
 
+#define FORTHI_MEM_ALLOC_CHUNK_SIZE 1024
+
 #define FORTHI_STATE_INTERPRET 0
 #define FORTHI_STATE_COMPILE 1
 #define FORTHI_STATE_EXECUTE 2
-
-#define FORTHI_MEM_ALLOC_CHUNK_SIZE 1024
 
 #define FORTHI_INST_RETURN 0
 #define FORTHI_INST_CALL_C_FUNCTION 1
@@ -192,6 +194,16 @@ int forth_addCWord(ForthContext* ctx, const char* name, forth_c_func fn);
 #define FORTHI_INST_CALL_WORD 3
 #define FORTHI_INST_PRINT_TEXT 4
 #define FORTHI_INST_EXECUTE 5
+
+#if FORTH_INT_SIZE_8_BITS
+#define FORTHI_CHAR_PRINT_CODE PRId8
+#elif FORTH_INT_SIZE_16_BITS
+#define FORTHI_CHAR_PRINT_CODE PRId16
+#elif FORTH_INT_SIZE_32_BITS
+#define FORTHI_CHAR_PRINT_CODE PRId32
+#elif FORTH_INT_SIZE_64_BITS
+#define FORTHI_CHAR_PRINT_CODE PRId64
+#endif
 
 #define FORTH_LOG(_ctx_, _fmt_, ...) \
 { \
@@ -201,23 +213,85 @@ int forth_addCWord(ForthContext* ctx, const char* name, forth_c_func fn);
         printf(_fmt_, __VA_ARGS__); \
 }
 
+//---------------------------------------------------------------------------
+// PROTOTYPES
+//---------------------------------------------------------------------------
+
+// Memory
+static int forthi_growMemory(ForthContext* ctx);
+static int forthi_growStack(ForthContext* ctx);
+static int forthi_growReturnStack(ForthContext* ctx);
+static int forthi_growDictionnary(ForthContext* ctx);
+static int forthi_reserveMemorySpace(ForthContext* ctx, int size);
+static int forthi_checkValidMemoryRange(ForthContext* ctx, forth_pointer_type at, forth_pointer_type size = 1);
+static int forthi_writeByte(ForthContext* ctx, uint8_t data);
+static int forthi_writeNumber(ForthContext* ctx, forth_int_type data);
+static int forthi_writePointer(ForthContext* ctx, forth_pointer_type data);
+static int forthi_writeFunction(ForthContext* ctx, forth_c_func fn);
+static int forthi_writeText(ForthContext* ctx, const char* text, size_t len);
+static int forthi_readByte(ForthContext* ctx, uint8_t* data);
+static int forthi_readFunction(ForthContext* ctx, forth_c_func* data);
+static int forthi_readNumber(ForthContext* ctx, forth_int_type* data);
+static int forthi_readPointer(ForthContext* ctx, forth_pointer_type* data);
+static const char* forthi_readText(ForthContext* ctx, forth_int_type* len);
+
+// Stack
+static int forthi_pushCell(ForthContext* ctx, ForthCell cell);
+static int forthi_pushIntNumber(ForthContext* ctx, forth_int_type number);
+static int forthi_pop(ForthContext* ctx, int count = 1);
+ForthCell* forth_top(ForthContext* ctx, int offset);
+
+// Return stack
+static int forthi_pushReturnPointer(ForthContext* ctx, forth_pointer_type pointer);
+forth_pointer_type forth_topReturn(ForthContext* ctx, int offset);
+static int forthi_popReturn(ForthContext* ctx, int count = 1);
+
+// Compile
+static int forthi_compileFunctionCall(ForthContext* ctx, forth_c_func fn);
+static int forthi_compilePushIntNumber(ForthContext* ctx, forth_int_type number);
+static int forthi_compileWordCall(ForthContext* ctx, forth_pointer_type pointer);
+
+// Dictionnary
+static int forthi_addWord(ForthContext* ctx, const char* name, int name_len, forth_pointer_type memory_offset);
+int forth_addCWord(ForthContext* ctx, const char* name, forth_c_func fn);
+static forth_pointer_type forthi_getWord(ForthContext* ctx, const char* name, size_t name_len);
+static int forthi_getWordIndex(ForthContext* ctx, const char* name, size_t name_len);
+
+// Interpreting
+static int forthi_isSpace(char c);
+static const char* forthi_trimCode(ForthContext* ctx);
+static const char* forthi_readUntil(ForthContext* ctx, char delim);
+static const char* forthi_getNextToken(ForthContext* ctx, size_t* token_len);
+static int forthi_isTokenNumber(const char* token, size_t token_len);
+static int forthi_interpretToken(ForthContext* ctx, const char* token, size_t token_len);
+static int forthi_interpret(ForthContext* ctx);
+int forth_eval(ForthContext* ctx, const char* code);
+
+// Standard words (Only those requiring forward declaration)
 static int forthi_word_dot_quote(ForthContext* ctx);
+static int forthi_word_ELSE(ForthContext* ctx);
 static int forthi_word_EXECUTE(ForthContext* ctx);
+static int forthi_word_IF(ForthContext* ctx);
 static int forthi_word_paren(ForthContext* ctx);
 static int forthi_word_semicolon(ForthContext* ctx);
+static int forthi_word_THEN(ForthContext* ctx);
 
-static int forthi_growReturnStack(ForthContext* ctx)
+//---------------------------------------------------------------------------
+// MEMORY
+//---------------------------------------------------------------------------
+
+static int forthi_growMemory(ForthContext* ctx)
 {
-    int new_size = sizeof(forth_pointer_type) * (ctx->return_stack_size + FORTHI_MEM_ALLOC_CHUNK_SIZE);
+    int new_size = ctx->memory_size + FORTHI_MEM_ALLOC_CHUNK_SIZE;
 
-    forth_pointer_type* new_stack = (forth_pointer_type*)malloc(new_size);
-    if (!new_stack)
+    uint8_t* new_memory = (uint8_t*)malloc(new_size);
+    if (!new_memory)
         return FORTH_FAILURE;
 
-    memcpy(new_stack, ctx->return_stack, ctx->return_stack_size * sizeof(forth_pointer_type));
-    free(ctx->return_stack);
-    ctx->return_stack = new_stack;
-    ctx->return_stack_size = new_size;
+    memcpy(new_memory, ctx->memory, ctx->memory_size);
+    free(ctx->memory);
+    ctx->memory = new_memory;
+    ctx->memory_size = new_size;
 
     return FORTH_SUCCESS;
 }
@@ -238,113 +312,18 @@ static int forthi_growStack(ForthContext* ctx)
     return FORTH_SUCCESS;
 }
 
-static int forthi_pushCell(ForthContext* ctx, ForthCell cell)
+static int forthi_growReturnStack(ForthContext* ctx)
 {
-    if (ctx->stack_pointer >= ctx->stack_size)
-    {
-        if (!ctx->stack_auto_resize)
-        {
-            FORTH_LOG(ctx, "Stack overflow\n");
-            return FORTH_FAILURE;
-        }
+    int new_size = sizeof(forth_pointer_type) * (ctx->return_stack_size + FORTHI_MEM_ALLOC_CHUNK_SIZE);
 
-        if (forthi_growStack(ctx) == FORTH_FAILURE)
-        {
-            FORTH_LOG(ctx, "Out of memory\n");
-            return FORTH_FAILURE;
-        }
-    }
-
-    ctx->stack[ctx->stack_pointer++] = cell;
-    return FORTH_SUCCESS;
-}
-
-static int forthi_pushReturnPointer(ForthContext* ctx, forth_pointer_type pointer)
-{
-    if (ctx->return_stack_pointer >= ctx->return_stack_size)
-    {
-        if (!ctx->return_stack_auto_resize)
-        {
-            FORTH_LOG(ctx, "Return stack overflow\n");
-            return FORTH_FAILURE;
-        }
-
-        if (forthi_growReturnStack(ctx) == FORTH_FAILURE)
-        {
-            FORTH_LOG(ctx, "Out of memory\n");
-            return FORTH_FAILURE;
-        }
-    }
-
-    ctx->return_stack[ctx->return_stack_pointer++] = pointer;
-    return FORTH_SUCCESS;
-}
-
-static int forthi_pushIntNumber(ForthContext* ctx, forth_int_type number)
-{
-    ForthCell cell;
-    cell.int_value = number;
-    return forthi_pushCell(ctx, cell);
-}
-
-static int forthi_pop(ForthContext* ctx, int count = 1)
-{
-    if (ctx->stack_pointer < count)
-    {
-        FORTH_LOG(ctx, "Stack underflow\n");
-        return FORTH_FAILURE;
-    }
-
-    ctx->stack_pointer -= count;
-    return FORTH_SUCCESS;
-}
-
-ForthCell* forth_top(ForthContext* ctx, int offset)
-{
-    if (!ctx)
-        return NULL;
-
-    if (ctx->stack_pointer <= offset)
-        return NULL;
-
-    return &ctx->stack[ctx->stack_pointer - offset - 1];
-}
-
-forth_pointer_type forth_topReturn(ForthContext* ctx, int offset)
-{
-    if (!ctx)
-        return NULL;
-
-    if (ctx->return_stack_pointer <= offset)
-        return NULL;
-
-    return ctx->return_stack[ctx->return_stack_pointer - offset - 1];
-}
-
-static int forthi_popReturn(ForthContext* ctx, int count = 1)
-{
-    if (ctx->return_stack_pointer < count)
-    {
-        FORTH_LOG(ctx, "Return stack underflow\n");
-        return FORTH_FAILURE;
-    }
-
-    ctx->return_stack_pointer -= count;
-    return FORTH_SUCCESS;
-}
-
-static int forthi_growMemory(ForthContext* ctx)
-{
-    int new_size = ctx->memory_size + FORTHI_MEM_ALLOC_CHUNK_SIZE;
-
-    uint8_t* new_memory = (uint8_t*)malloc(new_size);
-    if (!new_memory)
+    forth_pointer_type* new_stack = (forth_pointer_type*)malloc(new_size);
+    if (!new_stack)
         return FORTH_FAILURE;
 
-    memcpy(new_memory, ctx->memory, ctx->memory_size);
-    free(ctx->memory);
-    ctx->memory = new_memory;
-    ctx->memory_size = new_size;
+    memcpy(new_stack, ctx->return_stack, ctx->return_stack_size * sizeof(forth_pointer_type));
+    free(ctx->return_stack);
+    ctx->return_stack = new_stack;
+    ctx->return_stack_size = new_size;
 
     return FORTH_SUCCESS;
 }
@@ -400,93 +379,280 @@ static int forthi_reserveMemorySpace(ForthContext* ctx, int size)
     return FORTH_SUCCESS;
 }
 
-static int forthi_addFunctionInstData(ForthContext* ctx, forth_c_func fn)
+static int forthi_checkValidMemoryRange(ForthContext* ctx, forth_pointer_type at, forth_pointer_type size)
 {
-    if (forthi_reserveMemorySpace(ctx, sizeof(fn) + 2) == FORTH_FAILURE)
+    if (at + size > ctx->memory_pointer)
+    {
+        FORTH_LOG(ctx, "Invalid memory address\n");
+        return FORTH_FAILURE;
+    }
+    return FORTH_SUCCESS;
+}
+
+static int forthi_writeByte(ForthContext* ctx, uint8_t data)
+{
+    if (forthi_reserveMemorySpace(ctx, 1) == FORTH_FAILURE)
         return FORTH_FAILURE;
 
-    ctx->memory[ctx->memory_pointer++] = FORTHI_INST_CALL_C_FUNCTION;
+    ctx->memory[ctx->memory_pointer++] = data;
+
+    return FORTH_SUCCESS;
+}
+
+static int forthi_writeNumber(ForthContext* ctx, forth_int_type data)
+{
+    if (forthi_reserveMemorySpace(ctx, sizeof(forth_int_type)) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    *(forth_int_type*)&ctx->memory[ctx->memory_pointer] = data;
+    ctx->memory_pointer += (int)sizeof(forth_int_type);
+
+    return FORTH_SUCCESS;
+}
+
+static int forthi_writePointer(ForthContext* ctx, forth_pointer_type data)
+{
+    if (forthi_reserveMemorySpace(ctx, sizeof(forth_pointer_type)) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    *(forth_pointer_type*)&ctx->memory[ctx->memory_pointer] = data;
+    ctx->memory_pointer += (int)sizeof(forth_pointer_type);
+
+    return FORTH_SUCCESS;
+}
+
+static int forthi_writeFunction(ForthContext* ctx, forth_c_func fn)
+{
+    if (forthi_reserveMemorySpace(ctx, sizeof(fn)) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
     memcpy(ctx->memory + ctx->memory_pointer, &fn, sizeof(forth_c_func));
     ctx->memory_pointer += (int)sizeof(fn);
 
     return FORTH_SUCCESS;
 }
 
-static int forthi_addFunctionInst(ForthContext* ctx, forth_c_func fn)
+static int forthi_writeText(ForthContext* ctx, const char* text, size_t len)
 {
-    if (fn == forthi_word_paren)
-        return fn(ctx);
-
-    if (forthi_addFunctionInstData(ctx, fn) == FORTH_FAILURE)
+    if (forthi_writeNumber(ctx, (forth_int_type)len) == FORTH_FAILURE)
         return FORTH_FAILURE;
 
-    // Special cases for functions that need to allocate more memory,
-    // call them at compile time
-    if (fn == forthi_word_dot_quote ||
-        fn == forthi_word_semicolon)
-        return fn(ctx);
-
-    return FORTH_SUCCESS;
-}
-
-static int forthi_addReturnInst(ForthContext* ctx)
-{
-    ctx->state = FORTHI_STATE_INTERPRET;
-
-    if (forthi_reserveMemorySpace(ctx, 1) == FORTH_FAILURE)
+    if (forthi_reserveMemorySpace(ctx, (int)len) == FORTH_FAILURE)
         return FORTH_FAILURE;
 
-    ctx->memory[ctx->memory_pointer++] = FORTHI_INST_RETURN;
-
-    return FORTH_SUCCESS;
-}
-
-static int forthi_addInst(ForthContext* ctx, uint8_t inst)
-{
-    if (forthi_reserveMemorySpace(ctx, 1) == FORTH_FAILURE)
-        return FORTH_FAILURE;
-
-    ctx->memory[ctx->memory_pointer++] = inst;
-
-    return FORTH_SUCCESS;
-}
-
-static int forthi_addPushIntNumberInst(ForthContext* ctx, forth_int_type number)
-{
-    if (forthi_reserveMemorySpace(ctx, sizeof(forth_int_type) + 1) == FORTH_FAILURE)
-        return FORTH_FAILURE;
-
-    ctx->memory[ctx->memory_pointer++] = FORTHI_INST_PUSH_INT_NUMBER;
-    *(forth_int_type*)&ctx->memory[ctx->memory_pointer] = number;
-    ctx->memory_pointer += (int)sizeof(forth_int_type);
-
-    return FORTH_SUCCESS;
-}
-
-static int forthi_addWordCallInst(ForthContext* ctx, forth_pointer_type pointer)
-{
-    if (forthi_reserveMemorySpace(ctx, sizeof(forth_pointer_type) + 1) == FORTH_FAILURE)
-        return FORTH_FAILURE;
-
-    ctx->memory[ctx->memory_pointer++] = FORTHI_INST_CALL_WORD;
-    *(forth_pointer_type*)&ctx->memory[ctx->memory_pointer] = pointer;
-    ctx->memory_pointer += (int)sizeof(forth_pointer_type);
-
-    return FORTH_SUCCESS;
-}
-
-static int forthi_addTextData(ForthContext* ctx, const char* text, size_t len)
-{
-    if (forthi_reserveMemorySpace(ctx, (int)(len + 2)) == FORTH_FAILURE)
-        return FORTH_FAILURE;
-
-    *(forth_int_type*)&ctx->memory[ctx->memory_pointer] = (forth_int_type)len;
-    ctx->memory_pointer += (int)sizeof(forth_int_type);
     memcpy(ctx->memory + ctx->memory_pointer, text, len);
     ctx->memory_pointer += (forth_pointer_type)len;
 
     return FORTH_SUCCESS;
 }
+
+static int forthi_readByte(ForthContext* ctx, uint8_t* data)
+{
+    if (forthi_checkValidMemoryRange(ctx, ctx->program_pointer) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    *data = ctx->memory[ctx->program_pointer++];
+    return FORTH_SUCCESS;
+}
+
+static int forthi_readFunction(ForthContext* ctx, forth_c_func* data)
+{
+    if (forthi_checkValidMemoryRange(ctx, ctx->program_pointer, sizeof(forth_c_func)) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    memcpy(data, ctx->memory + ctx->program_pointer, sizeof(forth_c_func));
+    ctx->program_pointer += sizeof(forth_c_func);
+
+    return FORTH_SUCCESS;
+}
+
+static int forthi_readNumber(ForthContext* ctx, forth_int_type* data)
+{
+    if (forthi_checkValidMemoryRange(ctx, ctx->program_pointer, sizeof(forth_int_type)) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    *data = *(forth_int_type*)&ctx->memory[ctx->program_pointer];
+    ctx->program_pointer += sizeof(forth_int_type);
+
+    return FORTH_SUCCESS;
+}
+
+static int forthi_readPointer(ForthContext* ctx, forth_pointer_type* data)
+{
+    if (forthi_checkValidMemoryRange(ctx, ctx->program_pointer, sizeof(forth_pointer_type)) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    *data = *(forth_pointer_type*)&ctx->memory[ctx->program_pointer];
+    ctx->program_pointer += sizeof(forth_pointer_type);
+
+    return FORTH_SUCCESS;
+}
+
+static const char* forthi_readText(ForthContext* ctx, forth_int_type* len)
+{
+    const char* text = NULL;
+
+    if (forthi_readNumber(ctx, len) == FORTH_FAILURE)
+        return NULL;
+
+    if (forthi_checkValidMemoryRange(ctx, ctx->program_pointer, (forth_pointer_type)*len) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    text = (const char*)&ctx->memory[ctx->program_pointer];
+    ctx->program_pointer += (forth_pointer_type)*len;
+
+    return text;
+}
+
+//---------------------------------------------------------------------------
+// STACK
+//---------------------------------------------------------------------------
+
+static int forthi_pushCell(ForthContext* ctx, ForthCell cell)
+{
+    if (ctx->stack_pointer >= ctx->stack_size)
+    {
+        if (!ctx->stack_auto_resize)
+        {
+            FORTH_LOG(ctx, "Stack overflow\n");
+            return FORTH_FAILURE;
+        }
+
+        if (forthi_growStack(ctx) == FORTH_FAILURE)
+        {
+            FORTH_LOG(ctx, "Out of memory\n");
+            return FORTH_FAILURE;
+        }
+    }
+
+    ctx->stack[ctx->stack_pointer++] = cell;
+    return FORTH_SUCCESS;
+}
+
+static int forthi_pushIntNumber(ForthContext* ctx, forth_int_type number)
+{
+    ForthCell cell;
+    cell.int_value = number;
+    return forthi_pushCell(ctx, cell);
+}
+
+static int forthi_pop(ForthContext* ctx, int count)
+{
+    if (ctx->stack_pointer < count)
+    {
+        FORTH_LOG(ctx, "Stack underflow\n");
+        return FORTH_FAILURE;
+    }
+
+    ctx->stack_pointer -= count;
+    return FORTH_SUCCESS;
+}
+
+ForthCell* forth_top(ForthContext* ctx, int offset)
+{
+    if (!ctx)
+        return NULL;
+
+    if (ctx->stack_pointer <= offset)
+        return NULL;
+
+    return &ctx->stack[ctx->stack_pointer - offset - 1];
+}
+
+//---------------------------------------------------------------------------
+// RETURN STACK
+//---------------------------------------------------------------------------
+
+static int forthi_pushReturnPointer(ForthContext* ctx, forth_pointer_type pointer)
+{
+    if (ctx->return_stack_pointer >= ctx->return_stack_size)
+    {
+        if (!ctx->return_stack_auto_resize)
+        {
+            FORTH_LOG(ctx, "Return stack overflow\n");
+            return FORTH_FAILURE;
+        }
+
+        if (forthi_growReturnStack(ctx) == FORTH_FAILURE)
+        {
+            FORTH_LOG(ctx, "Out of memory\n");
+            return FORTH_FAILURE;
+        }
+    }
+
+    ctx->return_stack[ctx->return_stack_pointer++] = pointer;
+    return FORTH_SUCCESS;
+}
+
+forth_pointer_type forth_topReturn(ForthContext* ctx, int offset)
+{
+    if (!ctx)
+        return NULL;
+
+    if (ctx->return_stack_pointer <= offset)
+        return NULL;
+
+    return ctx->return_stack[ctx->return_stack_pointer - offset - 1];
+}
+
+static int forthi_popReturn(ForthContext* ctx, int count)
+{
+    if (ctx->return_stack_pointer < count)
+    {
+        FORTH_LOG(ctx, "Return stack underflow\n");
+        return FORTH_FAILURE;
+    }
+
+    ctx->return_stack_pointer -= count;
+    return FORTH_SUCCESS;
+}
+
+//---------------------------------------------------------------------------
+// COMPILE
+//---------------------------------------------------------------------------
+
+static int forthi_compileFunctionCall(ForthContext* ctx, forth_c_func fn)
+{
+    if (fn == forthi_word_paren)
+        return fn(ctx);
+
+    if (forthi_writeByte(ctx, FORTHI_INST_CALL_C_FUNCTION) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    if (forthi_writeFunction(ctx, fn) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    // Special cases for functions that need to allocate more memory,
+    // call them at compile time
+    if (fn == forthi_word_dot_quote ||
+        fn == forthi_word_semicolon ||
+        fn == forthi_word_IF ||
+        fn == forthi_word_ELSE ||
+        fn == forthi_word_THEN)
+        return fn(ctx);
+
+    return FORTH_SUCCESS;
+}
+
+static int forthi_compilePushIntNumber(ForthContext* ctx, forth_int_type number)
+{
+    if (forthi_writeByte(ctx, FORTHI_INST_PUSH_INT_NUMBER) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    return forthi_writeNumber(ctx, number);
+}
+
+static int forthi_compileWordCall(ForthContext* ctx, forth_pointer_type pointer)
+{
+    if (forthi_writeByte(ctx, FORTHI_INST_CALL_WORD) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    return forthi_writePointer(ctx, pointer);
+}
+
+//---------------------------------------------------------------------------
+// DICTIONNARY
+//---------------------------------------------------------------------------
 
 static int forthi_addWord(ForthContext* ctx, const char* name, int name_len, forth_pointer_type memory_offset)
 {
@@ -519,11 +685,57 @@ static int forthi_addWord(ForthContext* ctx, const char* name, int name_len, for
 int forth_addCWord(ForthContext* ctx, const char* name, forth_c_func fn)
 {
     forth_pointer_type memory_pointer = ctx->memory_pointer;
-    if (forthi_addFunctionInstData(ctx, fn) == FORTH_FAILURE)
+
+    if (forthi_writeByte(ctx, FORTHI_INST_CALL_C_FUNCTION) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    if (forthi_writeFunction(ctx, fn) == FORTH_FAILURE)
         return FORTH_FAILURE;
 
     return forthi_addWord(ctx, name, (int)strlen(name), memory_pointer);
 }
+
+static forth_pointer_type forthi_getWord(ForthContext* ctx, const char* name, size_t name_len)
+{
+    int index = ctx->dict_size - ctx->dict_pointer;
+    if (ctx->state == FORTHI_STATE_COMPILE)
+        index++; // Skip word being compiled
+
+    size_t compare_len = name_len > FORTH_DICT_CHAR_COUNT ? FORTH_DICT_CHAR_COUNT : name_len;
+    while (index < ctx->dict_size)
+    {
+        if (ctx->dict_name_lens[index] == name_len)
+            if (strncmp(ctx->dict_names + index * FORTH_DICT_CHAR_COUNT, name, compare_len) == 0)
+                return ctx->dict_pointers[index];
+
+        index++;
+    }
+
+    return (forth_pointer_type)-1;
+}
+
+static int forthi_getWordIndex(ForthContext* ctx, const char* name, size_t name_len)
+{
+    int index = ctx->dict_size - ctx->dict_pointer;
+    if (ctx->state == FORTHI_STATE_COMPILE)
+        index++; // Skip word being compiled
+
+    size_t compare_len = name_len > FORTH_DICT_CHAR_COUNT ? FORTH_DICT_CHAR_COUNT : name_len;
+    while (index < ctx->dict_size)
+    {
+        if (ctx->dict_name_lens[index] == name_len)
+            if (strncmp(ctx->dict_names + index * FORTH_DICT_CHAR_COUNT, name, compare_len) == 0)
+                return index;
+
+        index++;
+    }
+
+    return index;
+}
+
+//---------------------------------------------------------------------------
+// INTERPRETING
+//---------------------------------------------------------------------------
 
 static int forthi_isSpace(char c)
 {
@@ -577,44 +789,6 @@ static int forthi_isTokenNumber(const char* token, size_t token_len)
     return 0;
 }
 
-static forth_pointer_type forthi_getWord(ForthContext* ctx, const char* name, size_t name_len)
-{
-    int index = ctx->dict_size - ctx->dict_pointer;
-    if (ctx->state == FORTHI_STATE_COMPILE)
-        index++; // Skip word being compiled
-
-    size_t compare_len = name_len > FORTH_DICT_CHAR_COUNT ? FORTH_DICT_CHAR_COUNT : name_len;
-    while (index < ctx->dict_size)
-    {
-        if (ctx->dict_name_lens[index] == name_len)
-            if (strncmp(ctx->dict_names + index * FORTH_DICT_CHAR_COUNT, name, compare_len) == 0)
-                return ctx->dict_pointers[index];
-
-        index++;
-    }
-
-    return (forth_pointer_type)-1;
-}
-
-static forth_pointer_type forthi_getWordIndex(ForthContext* ctx, const char* name, size_t name_len)
-{
-    int index = ctx->dict_size - ctx->dict_pointer;
-    if (ctx->state == FORTHI_STATE_COMPILE)
-        index++; // Skip word being compiled
-
-    size_t compare_len = name_len > FORTH_DICT_CHAR_COUNT ? FORTH_DICT_CHAR_COUNT : name_len;
-    while (index < ctx->dict_size)
-    {
-        if (ctx->dict_name_lens[index] == name_len)
-            if (strncmp(ctx->dict_names + index * FORTH_DICT_CHAR_COUNT, name, compare_len) == 0)
-                return index;
-
-        index++;
-    }
-
-    return index;
-}
-
 static int forthi_interpretToken(ForthContext* ctx, const char* token, size_t token_len)
 {
     forth_pointer_type memory_pointer = forthi_getWord(ctx, token, token_len);
@@ -628,7 +802,7 @@ static int forthi_interpretToken(ForthContext* ctx, const char* token, size_t to
             if (ctx->state == FORTHI_STATE_INTERPRET)
                 return fn(ctx);
             else
-                return forthi_addFunctionInst(ctx, fn);
+                return forthi_compileFunctionCall(ctx, fn);
         }
         else if (word_type == FORTHI_INST_EXECUTE)
         {
@@ -638,7 +812,9 @@ static int forthi_interpretToken(ForthContext* ctx, const char* token, size_t to
                 return forthi_word_EXECUTE(ctx);
             }
             else
-                return forthi_addWordCallInst(ctx, memory_pointer + 1);
+            {
+                return forthi_compileWordCall(ctx, memory_pointer + 1);
+            }
         }
 
         return FORTH_FAILURE;
@@ -648,13 +824,9 @@ static int forthi_interpretToken(ForthContext* ctx, const char* token, size_t to
     {
         forth_int_type number = (forth_int_type)atoi(token);
         if (ctx->state == FORTHI_STATE_INTERPRET)
-        {
             return forthi_pushIntNumber(ctx, number);
-        }
-        else  if (ctx->state == FORTHI_STATE_COMPILE)
-        {
-            return forthi_addPushIntNumberInst(ctx, number);
-        }
+        else if (ctx->state == FORTHI_STATE_COMPILE)
+            return forthi_compilePushIntNumber(ctx, number);
 
         return FORTH_FAILURE;
     }
@@ -673,6 +845,26 @@ static int forthi_interpret(ForthContext* ctx)
             return FORTH_FAILURE;
     }
 
+    return FORTH_SUCCESS;
+}
+
+int forth_eval(ForthContext* ctx, const char* code)
+{
+    if (!ctx)
+        return FORTH_FAILURE;
+
+    if (!code)
+        return FORTH_FAILURE;
+
+    ctx->code = code;
+    ctx->state = FORTHI_STATE_INTERPRET;
+
+    if (forthi_interpret(ctx) == FORTH_FAILURE)
+    {
+        ctx->stack_pointer = 0;
+        ctx->return_stack_pointer = 0;
+        return FORTH_FAILURE;
+    }
     return FORTH_SUCCESS;
 }
 
@@ -824,10 +1016,11 @@ static int forthi_word_dot_quote(ForthContext* ctx)
 {
     if (ctx->state == FORTHI_STATE_EXECUTE)
     {
-        forth_int_type len = *(forth_int_type*)&ctx->memory[ctx->program_pointer];
-        ctx->program_pointer += (forth_pointer_type)sizeof(forth_int_type);
-        const char* text = (const char*)&ctx->memory[ctx->program_pointer];
-        ctx->program_pointer += (forth_pointer_type)len;
+        forth_int_type len;
+        const char* text = forthi_readText(ctx, &len);
+        if (text == NULL)
+            return FORTH_FAILURE;
+
         FORTH_LOG(ctx, "%.*s", (unsigned int)len, text);
         return FORTH_SUCCESS;
     }
@@ -844,7 +1037,7 @@ static int forthi_word_dot_quote(ForthContext* ctx)
     size_t len = string_end - string_start;
 
     if (ctx->state == FORTHI_STATE_COMPILE)
-        return forthi_addTextData(ctx, string_start, len);
+        return forthi_writeText(ctx, string_start, len);
 
     FORTH_LOG(ctx, "%.*s", (unsigned int)len, string_start);
     return FORTH_SUCCESS;
@@ -908,7 +1101,7 @@ static int forthi_word_zero_less(ForthContext* ctx)
         return FORTH_FAILURE;
 
     forth_int_type n = ctx->stack[ctx->stack_pointer].int_value;
-    return forthi_pushIntNumber(ctx, n < 0 ? -1 : 0);
+    return forthi_pushIntNumber(ctx, n < 0 ? FORTH_TRUE : FORTH_FALSE);
 }
 
 static int forthi_word_zero_not_equals(ForthContext* ctx)
@@ -917,7 +1110,7 @@ static int forthi_word_zero_not_equals(ForthContext* ctx)
         return FORTH_FAILURE;
 
     forth_int_type n = ctx->stack[ctx->stack_pointer].int_value;
-    return forthi_pushIntNumber(ctx, n != 0 ? -1 : 0);
+    return forthi_pushIntNumber(ctx, n != 0 ? FORTH_TRUE : FORTH_FALSE);
 }
 
 static int forthi_word_zero_equals(ForthContext* ctx)
@@ -926,7 +1119,7 @@ static int forthi_word_zero_equals(ForthContext* ctx)
         return FORTH_FAILURE;
 
     forth_int_type n = ctx->stack[ctx->stack_pointer].int_value;
-    return forthi_pushIntNumber(ctx, n == 0 ? -1 : 0);
+    return forthi_pushIntNumber(ctx, n == 0 ? FORTH_TRUE : FORTH_FALSE);
 }
 
 static int forthi_word_zero_greater(ForthContext* ctx)
@@ -935,7 +1128,7 @@ static int forthi_word_zero_greater(ForthContext* ctx)
         return FORTH_FAILURE;
 
     forth_int_type n = ctx->stack[ctx->stack_pointer].int_value;
-    return forthi_pushIntNumber(ctx, n > 0 ? -1 : 0);
+    return forthi_pushIntNumber(ctx, n > 0 ? FORTH_TRUE : FORTH_FALSE);
 }
 
 static int forthi_word_one_plus(ForthContext* ctx)
@@ -1138,7 +1331,7 @@ static int forthi_word_less_than(ForthContext* ctx)
 
     forth_int_type n1 = ctx->stack[ctx->stack_pointer].int_value;
     forth_int_type n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
-    return forthi_pushIntNumber(ctx, n1 < n2 ? -1 : 0);
+    return forthi_pushIntNumber(ctx, n1 < n2 ? FORTH_TRUE : FORTH_FALSE);
 }
 
 static int forthi_word_less_number_sign(ForthContext* ctx)
@@ -1154,7 +1347,7 @@ static int forthi_word_not_equals(ForthContext* ctx)
 
     forth_int_type n1 = ctx->stack[ctx->stack_pointer].int_value;
     forth_int_type n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
-    return forthi_pushIntNumber(ctx, n1 != n2 ? -1 : 0);
+    return forthi_pushIntNumber(ctx, n1 != n2 ? FORTH_TRUE : FORTH_FALSE);
 }
 
 static int forthi_word_equals(ForthContext* ctx)
@@ -1164,7 +1357,7 @@ static int forthi_word_equals(ForthContext* ctx)
 
     forth_int_type n1 = ctx->stack[ctx->stack_pointer].int_value;
     forth_int_type n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
-    return forthi_pushIntNumber(ctx, n1 == n2 ? -1 : 0);
+    return forthi_pushIntNumber(ctx, n1 == n2 ? FORTH_TRUE : FORTH_FALSE);
 }
 
 static int forthi_word_greater_than(ForthContext* ctx)
@@ -1174,7 +1367,7 @@ static int forthi_word_greater_than(ForthContext* ctx)
 
     forth_int_type n1 = ctx->stack[ctx->stack_pointer].int_value;
     forth_int_type n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
-    return forthi_pushIntNumber(ctx, n1 > n2 ? -1 : 0);
+    return forthi_pushIntNumber(ctx, n1 > n2 ? FORTH_TRUE : FORTH_FALSE);
 }
 
 static int forthi_word_to_body(ForthContext* ctx)
@@ -1221,8 +1414,17 @@ static int forthi_word_question_do(ForthContext* ctx)
 
 static int forthi_word_question_dupe(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    ForthCell* top = forth_top(ctx);
+    if (!top)
+    {
+        FORTH_LOG(ctx, "Stack underflow\n");
+        return FORTH_FAILURE;
+    }
+
+    if (top->int_value == FORTH_FALSE)
+        return FORTH_SUCCESS;
+
+    return forthi_pushCell(ctx, *top);
 }
 
 static int forthi_word_fetch(ForthContext* ctx)
@@ -1305,8 +1507,12 @@ static int forthi_word_ALSO(ForthContext* ctx)
 
 static int forthi_word_AND(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 2) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int_type n1 = ctx->stack[ctx->stack_pointer].int_value;
+    forth_int_type n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
+    return forthi_pushIntNumber(ctx, n1 & n2);
 }
 
 static int forthi_word_ASSEMBLER(ForthContext* ctx)
@@ -1811,7 +2017,45 @@ static int forthi_word_e_key_question(ForthContext* ctx)
 
 static int forthi_word_ELSE(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
+    if (ctx->state == FORTHI_STATE_INTERPRET)
+    {
+        FORTH_LOG(ctx, "Interpreting a compile-only word\n");
+        return FORTH_FAILURE;
+    }
+
+    if (ctx->state == FORTHI_STATE_COMPILE)
+    {
+        if (forthi_popReturn(ctx, 1) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        forth_pointer_type false_branch_pointer = ctx->return_stack[ctx->return_stack_pointer];
+
+        if (forthi_checkValidMemoryRange(ctx, false_branch_pointer, sizeof(forth_pointer_type)) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        *(forth_pointer_type*)&ctx->memory[false_branch_pointer] = ctx->memory_pointer;
+
+        if (forthi_pushReturnPointer(ctx, ctx->memory_pointer) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        if (forthi_reserveMemorySpace(ctx, sizeof(forth_pointer_type)) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        ctx->memory_pointer += sizeof(forth_pointer_type);
+
+        return FORTH_SUCCESS;
+    }
+
+    if (ctx->state == FORTHI_STATE_EXECUTE)
+    {
+        forth_pointer_type then_pointer;
+        if (forthi_readPointer(ctx, &then_pointer) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        ctx->program_pointer = then_pointer;
+        return FORTH_SUCCESS;
+    }
+    
     return FORTH_FAILURE;
 }
 
@@ -1881,6 +2125,11 @@ static int forthi_word_EVALUATE(ForthContext* ctx)
 
 static int forthi_word_EXECUTE(ForthContext* ctx)
 {
+    uint8_t inst;
+    forth_c_func fn;
+    forth_int_type number;
+    forth_pointer_type pointer;
+
     if (forthi_pop(ctx) == FORTH_FAILURE)
         return FORTH_FAILURE;
 
@@ -1890,35 +2139,33 @@ static int forthi_word_EXECUTE(ForthContext* ctx)
 
     while (ctx->return_stack_pointer > 0)
     {
-        if (ctx->program_pointer < 0 || ctx->program_pointer >= ctx->memory_pointer)
-        {
-            FORTH_LOG(ctx, "Invalid memory address\n");
+        if (forthi_readByte(ctx, &inst) == FORTH_FAILURE)
             return FORTH_FAILURE;
-        }
-        uint8_t inst = ctx->memory[ctx->program_pointer++];
 
         if (inst == FORTHI_INST_CALL_C_FUNCTION)
         {
-            forth_c_func fn = NULL;
-            memcpy(&fn, ctx->memory + ctx->program_pointer, sizeof(forth_c_func));
-            ctx->program_pointer += sizeof(forth_c_func);
+            if (forthi_readFunction(ctx, &fn) == FORTH_FAILURE)
+                return FORTH_FAILURE;
 
             if (fn(ctx) == FORTH_FAILURE)
                 return FORTH_FAILURE;
         }
         else if (inst == FORTHI_INST_PUSH_INT_NUMBER)
         {
-            forth_int_type number = *(forth_int_type*)&ctx->memory[ctx->program_pointer];
-            ctx->program_pointer += sizeof(forth_int_type);
+            if (forthi_readNumber(ctx, &number) == FORTH_FAILURE)
+                return FORTH_FAILURE;
+
             if (forthi_pushIntNumber(ctx, number) == FORTH_FAILURE)
                 return FORTH_FAILURE;
         }
         else if (inst == FORTHI_INST_CALL_WORD)
         {
-            forth_pointer_type pointer = *(forth_pointer_type*)&ctx->memory[ctx->program_pointer];
-            ctx->program_pointer += sizeof(forth_pointer_type);
+            if (forthi_readPointer(ctx, &pointer) == FORTH_FAILURE)
+                return FORTH_FAILURE;
+
             if (forthi_pushReturnPointer(ctx, ctx->program_pointer) == FORTH_FAILURE)
                 return FORTH_FAILURE;
+
             ctx->program_pointer = pointer;
         }
     }
@@ -2424,7 +2671,40 @@ static int forthi_word_I(ForthContext* ctx)
 
 static int forthi_word_IF(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
+    if (ctx->state == FORTHI_STATE_INTERPRET)
+    {
+        FORTH_LOG(ctx, "Interpreting a compile-only word\n");
+        return FORTH_FAILURE;
+    }
+
+    if (ctx->state == FORTHI_STATE_COMPILE)
+    {
+        if (forthi_pushReturnPointer(ctx, ctx->memory_pointer) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        if (forthi_reserveMemorySpace(ctx, sizeof(forth_pointer_type)) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        ctx->memory_pointer += sizeof(forth_pointer_type);
+
+        return FORTH_SUCCESS;
+    }
+
+    if (ctx->state == FORTHI_STATE_EXECUTE)
+    {
+        if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        forth_pointer_type false_branch_pointer;
+        if (forthi_readPointer(ctx, &false_branch_pointer) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        if (ctx->stack[ctx->stack_pointer].int_value == FORTH_FALSE)
+            ctx->program_pointer = false_branch_pointer;
+
+        return FORTH_SUCCESS;
+    }
+    
     return FORTH_FAILURE;
 }
 
@@ -2814,8 +3094,12 @@ static int forthi_word_OPEN_FILE(ForthContext* ctx)
 
 static int forthi_word_OR(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 2) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int_type n1 = ctx->stack[ctx->stack_pointer].int_value;
+    forth_int_type n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
+    return forthi_pushIntNumber(ctx, n1 | n2);
 }
 
 static int forthi_word_ORDER(ForthContext* ctx)
@@ -3226,8 +3510,28 @@ static int forthi_word_s_backslash_quote(ForthContext* ctx)
 
 static int forthi_word_THEN(ForthContext* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (ctx->state == FORTHI_STATE_INTERPRET)
+    {
+        FORTH_LOG(ctx, "Interpreting a compile-only word\n");
+        return FORTH_FAILURE;
+    }
+
+    if (ctx->state == FORTHI_STATE_COMPILE)
+    {
+        if (forthi_popReturn(ctx, 1) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        forth_pointer_type if_else_branch_pointer = ctx->return_stack[ctx->return_stack_pointer];
+
+        if (forthi_checkValidMemoryRange(ctx, if_else_branch_pointer, sizeof(forth_pointer_type)) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        *(forth_pointer_type*)&ctx->memory[if_else_branch_pointer] = ctx->memory_pointer;
+
+        return FORTH_SUCCESS;
+    }
+    
+    return FORTH_SUCCESS;
 }
 
 static int forthi_word_THROW(ForthContext* ctx)
@@ -3377,10 +3681,10 @@ static int forthi_word_WITHIN(ForthContext* ctx)
     forth_int_type n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
     forth_int_type n3 = ctx->stack[ctx->stack_pointer + 2].int_value;
 
-    forth_int_type result = 0;
+    forth_int_type result = FORTH_FALSE;
 
     if (n2 < n3 && n1 >= n2 && n1 < n3)
-        result = -1;
+        result = FORTH_TRUE;
 
     return forthi_pushIntNumber(ctx, result);
 }
@@ -3583,6 +3887,8 @@ static int forthi_word_brace_colon(ForthContext* ctx)
     return FORTH_FAILURE;
 }
 
+//---------------------------------------------------------------------------
+// INIT AND SHUTDOWN
 //---------------------------------------------------------------------------
 
 static int forthi_defineStandardWords(ForthContext* ctx)
@@ -3900,6 +4206,7 @@ static int forthi_defineStandardWords(ForthContext* ctx)
     FORTHI_DEFINE_STANDARD_WORD("NAME>STRING", forthi_word_name_to_string);
     FORTHI_DEFINE_STANDARD_WORD("NEGATE", forthi_word_NEGATE);
     FORTHI_DEFINE_STANDARD_WORD("NIP", forthi_word_NIP);
+    FORTHI_DEFINE_STANDARD_WORD("NOT", forthi_word_zero_equals); // For convenience
     FORTHI_DEFINE_STANDARD_WORD("NR>", forthi_word_n_r_from);
     FORTHI_DEFINE_STANDARD_WORD("OF", forthi_word_OF);
     FORTHI_DEFINE_STANDARD_WORD("ONLY", forthi_word_ONLY);
@@ -4034,16 +4341,16 @@ static int forthi_defineStandardWords(ForthContext* ctx)
 
 ForthContext* forth_createContext(int memory_size, int stack_size, int return_stack_size, int dict_size)
 {
-    if (memory_size < -1 || memory_size == 0)
+    if (memory_size <= 0 && memory_size != FORTH_MEM_INFINITE)
         return NULL;
 
-    if (stack_size < -1 || stack_size == 0)
+    if (stack_size <= 0 && stack_size != FORTH_MEM_INFINITE)
         return NULL;
 
-    if (return_stack_size < -1 || return_stack_size == 0)
+    if (return_stack_size <= 0 && return_stack_size != FORTH_MEM_INFINITE)
         return NULL;
 
-    if (dict_size < -1 || dict_size == 0)
+    if (dict_size <= 0 && dict_size != FORTH_MEM_INFINITE)
         return NULL;
 
     ForthContext* ctx = (ForthContext*)malloc(sizeof(ForthContext));
@@ -4052,7 +4359,7 @@ ForthContext* forth_createContext(int memory_size, int stack_size, int return_st
 
     memset(ctx, 0, sizeof(ForthContext));
 
-    ctx->memory_auto_resize = memory_size == -1 ? 1 : 0;
+    ctx->memory_auto_resize = memory_size == FORTH_MEM_INFINITE ? 1 : 0;
     ctx->memory_size = ctx->memory_auto_resize ? (436 * (sizeof(forth_c_func) + 2) / FORTHI_MEM_ALLOC_CHUNK_SIZE * FORTHI_MEM_ALLOC_CHUNK_SIZE + FORTHI_MEM_ALLOC_CHUNK_SIZE) : memory_size;
     ctx->memory = (uint8_t*)malloc(ctx->memory_size);
     if (!ctx->memory)
@@ -4061,7 +4368,7 @@ ForthContext* forth_createContext(int memory_size, int stack_size, int return_st
         return NULL;
     }
 
-    ctx->stack_auto_resize = stack_size == -1 ? 1 : 0;
+    ctx->stack_auto_resize = stack_size == FORTH_MEM_INFINITE ? 1 : 0;
     ctx->stack_size = ctx->stack_auto_resize ? FORTHI_MEM_ALLOC_CHUNK_SIZE : stack_size;
     ctx->stack = (ForthCell*)malloc(sizeof(ForthCell) * ctx->stack_size);
     if (!ctx->stack)
@@ -4070,7 +4377,7 @@ ForthContext* forth_createContext(int memory_size, int stack_size, int return_st
         return NULL;
     }
 
-    ctx->return_stack_auto_resize = return_stack_size == -1 ? 1 : 0;
+    ctx->return_stack_auto_resize = return_stack_size == FORTH_MEM_INFINITE ? 1 : 0;
     ctx->return_stack_size = ctx->return_stack_auto_resize ? FORTHI_MEM_ALLOC_CHUNK_SIZE : return_stack_size;
     ctx->return_stack = (forth_pointer_type*)malloc(sizeof(forth_pointer_type) * ctx->return_stack_size);
     if (!ctx->return_stack)
@@ -4079,7 +4386,7 @@ ForthContext* forth_createContext(int memory_size, int stack_size, int return_st
         return NULL;
     }
 
-    ctx->dict_auto_resize = dict_size == -1 ? 1 : 0;
+    ctx->dict_auto_resize = dict_size == FORTH_MEM_INFINITE ? 1 : 0;
     ctx->dict_size = ctx->dict_auto_resize ? FORTHI_MEM_ALLOC_CHUNK_SIZE : dict_size;
     ctx->dict_name_lens = (uint8_t*)malloc(ctx->dict_size);
     if (!ctx->dict_name_lens)
@@ -4133,20 +4440,6 @@ void forth_destroyContext(ForthContext* ctx)
         free(ctx->dict_pointers);
 
     free(ctx);
-}
-
-int forth_eval(ForthContext* ctx, const char* code)
-{
-    if (!ctx)
-        return FORTH_FAILURE;
-
-    if (!code)
-        return FORTH_FAILURE;
-
-    ctx->code = code;
-    ctx->state = FORTHI_STATE_INTERPRET;
-
-    return forthi_interpret(ctx);
 }
 
 #endif
