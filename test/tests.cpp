@@ -2766,7 +2766,24 @@ TEST_CASE("HERE", "[HERE]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "HERE", FORTH_FAILURE, {}, "Unimplemented\n");
+    auto mem_pointer = ctx->memory_pointer;
+    REQUIRE(forth_eval(ctx, "HERE") == FORTH_SUCCESS);
+    REQUIRE(ctx->stack_pointer == 1);
+    REQUIRE(ctx->stack[0].int_value == mem_pointer);
+    ctx->stack_pointer = 0;
+
+    // Compiling a new WORD should increase the HERE cursor
+    auto here_before = ctx->memory_pointer;
+    REQUIRE(forth_eval(ctx, ": foo 100 + ;") == FORTH_SUCCESS);
+    auto here_after = ctx->memory_pointer;
+    REQUIRE(here_before < here_after);
+
+    // Calling this simple function shouldn't touch memory
+    REQUIRE(forth_eval(ctx, "10 foo") == FORTH_SUCCESS);
+    REQUIRE(forth_eval(ctx, "HERE") == FORTH_SUCCESS);
+    REQUIRE(ctx->stack_pointer == 2);
+    REQUIRE(ctx->stack[1].int_value == here_after);
+    ctx->stack_pointer = 0;
 
     forth_destroy_context(ctx);
 }

@@ -674,7 +674,8 @@ static int forthi_pop_return(forth_context* ctx, int count)
 static int forthi_compile_function_call(forth_context* ctx, forth_c_func fn)
 {
     // Comments
-    if (fn == forthi_word_paren)
+    if (fn == forthi_word_paren ||
+        fn == forthi_word_THEN)
         return fn(ctx);
 
     if (forthi_write_byte(ctx, FORTHI_INST_CALL_C_FUNCTION) == FORTH_FAILURE)
@@ -690,9 +691,10 @@ static int forthi_compile_function_call(forth_context* ctx, forth_c_func fn)
         fn == forthi_word_dot_quote ||
         fn == forthi_word_semicolon ||
         fn == forthi_word_IF ||
-        fn == forthi_word_ELSE ||
-        fn == forthi_word_THEN)
+        fn == forthi_word_ELSE)
+    {
         return fn(ctx);
+    }
 
     return FORTH_SUCCESS;
 }
@@ -2768,8 +2770,7 @@ static int forthi_word_GET_ORDER(forth_context* ctx)
 
 static int forthi_word_HERE(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    return forthi_push_int_number(ctx, ctx->memory_pointer);
 }
 
 static int forthi_word_HEX(forth_context* ctx)
