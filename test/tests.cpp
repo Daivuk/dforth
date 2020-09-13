@@ -645,7 +645,40 @@ TEST_CASE("one_minus", "[one_minus]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "1-", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "1-", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 1-", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 2 1-", FORTH_SUCCESS, {1, 1});
+    evalTestSection(ctx, "0 1-", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "-1 1-", FORTH_SUCCESS, {-2});
+    evalTestSection(ctx, "1 1-", FORTH_SUCCESS, {0});
+
+    forth_destroy_context(ctx);
+}
+
+TEST_CASE("two_plus", "[two_plus]")
+{
+    forth_context* ctx = forth_create_context();
+
+    evalTestSection(ctx, "2+", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2+", FORTH_SUCCESS, {3});
+    evalTestSection(ctx, "1 2 2+", FORTH_SUCCESS, {1, 4});
+    evalTestSection(ctx, "0 2+", FORTH_SUCCESS, {2});
+    evalTestSection(ctx, "-1 2+", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "1 2+", FORTH_SUCCESS, {3});
+
+    forth_destroy_context(ctx);
+}
+
+TEST_CASE("two_minus", "[two_minus]")
+{
+    forth_context* ctx = forth_create_context();
+
+    evalTestSection(ctx, "2-", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2-", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "1 2 2-", FORTH_SUCCESS, {1, 0});
+    evalTestSection(ctx, "0 2-", FORTH_SUCCESS, {-2});
+    evalTestSection(ctx, "-1 2-", FORTH_SUCCESS, {-3});
+    evalTestSection(ctx, "1 2-", FORTH_SUCCESS, {-1});
 
     forth_destroy_context(ctx);
 }
@@ -2801,7 +2834,10 @@ TEST_CASE("INCLUDE", "[INCLUDE]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "INCLUDE", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "INCLUDE bad_filename.f", FORTH_FAILURE, {}, "No such file or directory\n");
+    evalTestSection(ctx, "INCLUDE INCLUDE.f", FORTH_SUCCESS, {});
+    evalTestSection(ctx, "INCLUDE INCLUDE.f foo", FORTH_SUCCESS, {}, "foo\n");
+    evalTestSection(ctx, "INCLUDE INCLUDE_INCLUDE.f bar", FORTH_SUCCESS, {}, "foo\n");
 
     forth_destroy_context(ctx);
 }

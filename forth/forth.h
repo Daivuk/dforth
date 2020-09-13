@@ -387,6 +387,36 @@ static int forthi_reserve_memory_space(forth_context* ctx, int size)
     return FORTH_SUCCESS;
 }
 
+static int forthi_reserve_aligned_memory_space(forth_context* ctx, forth_pointer size)
+{
+    forth_pointer reminder = ctx->memory_pointer % sizeof(uintptr_t);
+    if (reminder > 0)
+        size += sizeof(uintptr_t) - reminder;
+
+    forth_pointer space_left = ctx->memory_size - ctx->memory_pointer;
+    while (size > space_left)
+    {
+        if (!ctx->memory_auto_resize)
+        {
+            FORTH_LOG(ctx, "Out of memory\n");
+            return FORTH_FAILURE;
+        }
+
+        if (forthi_grow_memory(ctx) == FORTH_FAILURE)
+        {
+            FORTH_LOG(ctx, "Out of memory\n");
+            return FORTH_FAILURE;
+        }
+
+        space_left = ctx->memory_size - ctx->memory_pointer;
+    }
+
+    if (reminder > 0)
+        ctx->memory_pointer += sizeof(uintptr_t) - reminder;
+
+    return FORTH_SUCCESS;
+}
+
 static int forthi_check_valid_memory_range(forth_context* ctx, forth_pointer at, forth_pointer size)
 {
     if (at + size > ctx->memory_pointer)
@@ -394,6 +424,24 @@ static int forthi_check_valid_memory_range(forth_context* ctx, forth_pointer at,
         FORTH_LOG(ctx, "Invalid memory address\n");
         return FORTH_FAILURE;
     }
+    return FORTH_SUCCESS;
+}
+
+static int forthi_check_valid_aligned_memory_range(forth_context* ctx, forth_pointer at, forth_pointer size)
+{
+    int reminder = ctx->memory_pointer % sizeof(uintptr_t);
+    if (reminder > 0)
+        size += sizeof(uintptr_t) - reminder;
+
+    if (at + size > ctx->memory_pointer)
+    {
+        FORTH_LOG(ctx, "Invalid memory address\n");
+        return FORTH_FAILURE;
+    }
+    
+    if (reminder > 0)
+        ctx->memory_pointer += sizeof(uintptr_t) - reminder;
+
     return FORTH_SUCCESS;
 }
 
@@ -424,7 +472,7 @@ static int forthi_write_pointer(forth_context* ctx, forth_pointer data)
         return FORTH_FAILURE;
 
     *(forth_pointer*)&ctx->memory[ctx->memory_pointer] = data;
-    ctx->memory_pointer += (int)sizeof(forth_pointer);
+    ctx->memory_pointer += (forth_pointer)sizeof(forth_pointer);
 
     return FORTH_SUCCESS;
 }
@@ -435,7 +483,9 @@ static int forthi_write_function(forth_context* ctx, forth_c_func fn)
         return FORTH_FAILURE;
 
     memcpy(ctx->memory + ctx->memory_pointer, &fn, sizeof(forth_c_func));
-    ctx->memory_pointer += (int)sizeof(fn);
+    ctx->memory_pointer += (forth_pointer)sizeof(forth_c_func);
+    //*(forth_c_func*)&ctx->memory[ctx->memory_pointer] = fn;
+    //ctx->memory_pointer += (int)sizeof(forth_c_func);
 
     return FORTH_SUCCESS;
 }
@@ -469,7 +519,9 @@ static int forthi_read_function(forth_context* ctx, forth_c_func* data)
         return FORTH_FAILURE;
 
     memcpy(data, ctx->memory + ctx->program_pointer, sizeof(forth_c_func));
-    ctx->program_pointer += sizeof(forth_c_func);
+    ctx->program_pointer += (forth_pointer)sizeof(forth_c_func);
+    //*data = *(forth_c_func*)&ctx->memory[ctx->program_pointer];
+    //ctx->program_pointer += sizeof(forth_c_func);
 
     return FORTH_SUCCESS;
 }
@@ -491,7 +543,7 @@ static int forthi_read_pointer(forth_context* ctx, forth_pointer* data)
         return FORTH_FAILURE;
 
     *data = *(forth_pointer*)&ctx->memory[ctx->program_pointer];
-    ctx->program_pointer += sizeof(forth_pointer);
+    ctx->program_pointer += (forth_pointer)sizeof(forth_pointer);
 
     return FORTH_SUCCESS;
 }
@@ -621,6 +673,7 @@ static int forthi_pop_return(forth_context* ctx, int count)
 
 static int forthi_compile_function_call(forth_context* ctx, forth_c_func fn)
 {
+    // Comments
     if (fn == forthi_word_paren)
         return fn(ctx);
 
@@ -630,8 +683,9 @@ static int forthi_compile_function_call(forth_context* ctx, forth_c_func fn)
     if (forthi_write_function(ctx, fn) == FORTH_FAILURE)
         return FORTH_FAILURE;
 
-    // Special cases for functions that need to allocate more memory,
-    // call them at compile time
+    // Special cases for WORDs that need to do special things at compile
+    // time, like: allocate memory, set state flag, etc.
+    // Call them at compile time
     if (fn == forthi_word_abort_quote ||
         fn == forthi_word_dot_quote ||
         fn == forthi_word_semicolon ||
@@ -1151,8 +1205,29 @@ static int forthi_word_one_plus(forth_context* ctx)
 
 static int forthi_word_one_minus(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int n = ctx->stack[ctx->stack_pointer].int_value;
+    return forthi_push_int_number(ctx, n - 1);
+}
+
+static int forthi_word_two_plus(forth_context* ctx)
+{
+    if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int n = ctx->stack[ctx->stack_pointer].int_value;
+    return forthi_push_int_number(ctx, n + 2);
+}
+
+static int forthi_word_two_minus(forth_context* ctx)
+{
+    if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int n = ctx->stack[ctx->stack_pointer].int_value;
+    return forthi_push_int_number(ctx, n - 2);
 }
 
 static int forthi_word_two_store(forth_context* ctx)
@@ -2087,15 +2162,13 @@ static int forthi_word_ELSE(forth_context* ctx)
         if (forthi_check_valid_memory_range(ctx, false_branch_pointer, sizeof(forth_pointer)) == FORTH_FAILURE)
             return FORTH_FAILURE;
 
-        *(forth_pointer*)&ctx->memory[false_branch_pointer] = ctx->memory_pointer;
-
         if (forthi_push_return_pointer(ctx, ctx->memory_pointer) == FORTH_FAILURE)
             return FORTH_FAILURE;
 
-        if (forthi_reserve_memory_space(ctx, sizeof(forth_pointer)) == FORTH_FAILURE)
+        if (forthi_write_pointer(ctx, 0) == FORTH_FAILURE)
             return FORTH_FAILURE;
 
-        ctx->memory_pointer += sizeof(forth_pointer);
+        *(forth_pointer*)&ctx->memory[false_branch_pointer] = ctx->memory_pointer;
 
         return FORTH_SUCCESS;
     }
@@ -2736,12 +2809,7 @@ static int forthi_word_IF(forth_context* ctx)
         if (forthi_push_return_pointer(ctx, ctx->memory_pointer) == FORTH_FAILURE)
             return FORTH_FAILURE;
 
-        if (forthi_reserve_memory_space(ctx, sizeof(forth_pointer)) == FORTH_FAILURE)
-            return FORTH_FAILURE;
-
-        ctx->memory_pointer += sizeof(forth_pointer);
-
-        return FORTH_SUCCESS;
+        return forthi_write_pointer(ctx, 0);
     }
 
     if (ctx->state == FORTHI_STATE_EXECUTE)
@@ -2770,7 +2838,66 @@ static int forthi_word_IMMEDIATE(forth_context* ctx)
 
 static int forthi_word_INCLUDE(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
+    if (ctx->state == FORTHI_STATE_INTERPRET)
+    {
+        size_t filename_len;
+        const char* filename = forthi_get_next_token(ctx, &filename_len);
+        if (!filename || filename_len > 259)
+        {
+            FORTH_LOG(ctx, "No such file or directory\n");
+            return FORTH_FAILURE;
+        }
+
+        char zs_filename[260];
+        memcpy(zs_filename, filename, filename_len);
+        zs_filename[filename_len] = '\0';
+
+        FILE* file = fopen(zs_filename, "rb");
+        if (!file)
+        {
+            FORTH_LOG(ctx, "No such file or directory\n");
+            return FORTH_FAILURE;
+        }
+
+        fseek(file, 0, SEEK_END);
+        size_t file_size = (size_t)ftell(file);
+        fseek(file, 0, SEEK_SET);
+
+        if (file_size == 0)
+        {
+            fclose(file);
+            return FORTH_SUCCESS; // Nothing to load, its a success nothing gets copied
+        }
+
+        char* file_content = (char*)malloc(file_size + 1);
+        if (!file_content)
+        {
+            fclose(file);
+            FORTH_LOG(ctx, "Out of memory\n");
+            return FORTH_FAILURE;
+        }
+        size_t byte_read = fread(file_content, 1, file_size, file);
+        file_content[file_size] = '\0';
+        fclose(file);
+
+        if (byte_read != file_size)
+        {
+            free(file_content);
+            FORTH_LOG(ctx, "Error reading file\n");
+            return FORTH_FAILURE;
+        }
+        
+        const char* previous_code = ctx->code;
+
+        int result = forth_eval(ctx, file_content);
+        
+        free(file_content);
+        ctx->code = previous_code;
+
+        return result;
+    }
+
+    FORTH_LOG(ctx, "Interpret-only word\n");
     return FORTH_FAILURE;
 }
 
@@ -3990,6 +4117,8 @@ static int forthi_defineStandardWords(forth_context* ctx)
     FORTHI_DEFINE_STANDARD_WORD("0>", forthi_word_zero_greater);
     FORTHI_DEFINE_STANDARD_WORD("1+", forthi_word_one_plus);
     FORTHI_DEFINE_STANDARD_WORD("1-", forthi_word_one_minus);
+    FORTHI_DEFINE_STANDARD_WORD("2+", forthi_word_two_plus);
+    FORTHI_DEFINE_STANDARD_WORD("2-", forthi_word_two_minus);
     FORTHI_DEFINE_STANDARD_WORD("2!", forthi_word_two_store);
     FORTHI_DEFINE_STANDARD_WORD("2*", forthi_word_two_star);
     FORTHI_DEFINE_STANDARD_WORD("2/", forthi_word_two_slash);
@@ -4396,6 +4525,10 @@ static int forthi_defineStandardWords(forth_context* ctx)
 
     ctx->default_dict_pointer = ctx->dict_pointer;
 
+    //forth_pointer reminder = ctx->memory_pointer % sizeof(uintptr_t);
+    //if (reminder > 0)
+    //    ctx->memory_pointer += (forth_pointer)sizeof(uintptr_t) - reminder;
+
     return FORTH_SUCCESS;
 }
 
@@ -4421,7 +4554,7 @@ forth_context* forth_create_context(int memory_size, int stack_size, int return_
 
     ctx->memory_auto_resize = memory_size == FORTH_MEM_INFINITE ? 1 : 0;
     ctx->memory_size = ctx->memory_auto_resize 
-        ? (436 * (sizeof(forth_c_func) + 2) / FORTHI_MEM_ALLOC_CHUNK_SIZE * FORTHI_MEM_ALLOC_CHUNK_SIZE + 
+        ? (435 * (sizeof(forth_c_func) + 2) / FORTHI_MEM_ALLOC_CHUNK_SIZE * FORTHI_MEM_ALLOC_CHUNK_SIZE + 
             FORTHI_MEM_ALLOC_CHUNK_SIZE) 
         : memory_size;
     ctx->memory = (uint8_t*)malloc(ctx->memory_size);
