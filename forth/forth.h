@@ -1584,8 +1584,17 @@ static int forthi_word_abort_quote(forth_context* ctx)
 
 static int forthi_word_abs(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (ctx->stack_pointer < 1)
+    {
+        FORTH_LOG(ctx, "Stack underflow\n");
+        return FORTH_FAILURE;
+    }
+
+    forth_int n = ctx->stack[ctx->stack_pointer - 1].int_value;
+    if (n < 0) n = -n;
+    ctx->stack[ctx->stack_pointer - 1].int_value = n;
+
+    return FORTH_SUCCESS;
 }
 
 static int forthi_word_ACCEPT(forth_context* ctx)
@@ -3188,14 +3197,22 @@ static int forthi_word_MARKER(forth_context* ctx)
 
 static int forthi_word_MAX(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 2) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int n1 = ctx->stack[ctx->stack_pointer].int_value;
+    forth_int n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
+    return forthi_push_int_number(ctx, n1 > n2 ? n1 : n2);
 }
 
 static int forthi_word_MIN(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 2) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int n1 = ctx->stack[ctx->stack_pointer].int_value;
+    forth_int n2 = ctx->stack[ctx->stack_pointer + 1].int_value;
+    return forthi_push_int_number(ctx, n1 < n2 ? n1 : n2);
 }
 
 static int forthi_word_MOD(forth_context* ctx)
@@ -3246,8 +3263,15 @@ static int forthi_word_name_to_string(forth_context* ctx)
 
 static int forthi_word_NEGATE(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (ctx->stack_pointer < 1)
+    {
+        FORTH_LOG(ctx, "Stack underflow\n");
+        return FORTH_FAILURE;
+    }
+
+    ctx->stack[ctx->stack_pointer - 1].int_value = -ctx->stack[ctx->stack_pointer - 1].int_value;
+
+    return FORTH_SUCCESS;
 }
 
 static int forthi_word_NIP(forth_context* ctx)
