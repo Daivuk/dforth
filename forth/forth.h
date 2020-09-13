@@ -1240,14 +1240,20 @@ static int forthi_word_two_store(forth_context* ctx)
 
 static int forthi_word_two_star(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int n = ctx->stack[ctx->stack_pointer].int_value;
+    return forthi_push_int_number(ctx, n << 1);
 }
 
 static int forthi_word_two_slash(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int n = ctx->stack[ctx->stack_pointer].int_value;
+    return forthi_push_int_number(ctx, n / 2);
 }
 
 static int forthi_word_two_to_r(forth_context* ctx)

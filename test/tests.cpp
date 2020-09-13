@@ -696,7 +696,13 @@ TEST_CASE("two_star", "[two_star]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "2*", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "2*", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2*", FORTH_SUCCESS, {2});
+    evalTestSection(ctx, "1 2 2*", FORTH_SUCCESS, {1, 4});
+    evalTestSection(ctx, "0 2*", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "-1 2*", FORTH_SUCCESS, {-2});
+    evalTestSection(ctx, "1 2*", FORTH_SUCCESS, {2});
+    evalTestSection(ctx, "4000 2*", FORTH_SUCCESS, {8000});
 
     forth_destroy_context(ctx);
 }
@@ -705,7 +711,13 @@ TEST_CASE("two_slash", "[two_slash]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "2/", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "2/", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2/", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 2 2/", FORTH_SUCCESS, {1, 1});
+    evalTestSection(ctx, "0 2/", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "-1 2/", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 2/", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "4000 2/", FORTH_SUCCESS, {2000});
 
     forth_destroy_context(ctx);
 }
