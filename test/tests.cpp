@@ -240,6 +240,20 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
     evalTest(ctx, "600 COMMISSION .", FORTH_SUCCESS, {}, "50 ");
     evalTest(ctx, "450 COMMISSION .", FORTH_SUCCESS, {}, "45 ");
     evalTest(ctx, "50 COMMISSION .", FORTH_SUCCESS, {}, "5 ");
+    // TODO: */ */MOD
+
+    // Chapter 6
+    evalTest(ctx, ": TEST 10 0 DO CR .\" Hello \" LOOP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "TEST", FORTH_SUCCESS, {}, "\nHello \nHello \nHello \nHello \nHello \nHello \nHello \nHello \nHello \nHello ");
+    evalTest(ctx, ": DECADE 10 0 DO I . LOOP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "DECADE", FORTH_SUCCESS, {}, "0 1 2 3 4 5 6 7 8 9 ");
+    evalTest(ctx, ": SAMPLE -243 -250 DO I . LOOP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "SAMPLE", FORTH_SUCCESS, {}, "-250 -249 -248 -247 -246 -245 -244 ");
+    evalTest(ctx, ": MULTIPLICATIONS CR 11 1 DO DUP I * . LOOP DROP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "7 MULTIPLICATIONS", FORTH_SUCCESS, {}, "\n7 14 21 28 35 42 49 56 63 70 ");
+    //evalTest(ctx, ": COMPOUND ( amt int -- )\n   SWAP 21 1 DO .\" YEAR \" I . 3 SPACES\n    2DUP R% + DUP .\" BALANCE \" . CR LOOP 2DROP ;", FORTH_SUCCESS, {}, "");
+    //evalTest(ctx, "1000 6 COMPOUND", FORTH_SUCCESS, {}, "");
+
 
     forth_destroy_context(ctx);
 }
@@ -336,7 +350,7 @@ TEST_CASE("star_slash", "[star_slash]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "*/", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "*/", FORTH_FAILURE, {}, "Stack underflow\n");
 
     forth_destroy_context(ctx);
 }
@@ -1041,7 +1055,9 @@ TEST_CASE("to_r", "[to_r]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, ">R", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, ">R", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 >R", FORTH_SUCCESS, {});
+    evalTestSection(ctx, "1 2 >R", FORTH_SUCCESS, {1});
 
     forth_destroy_context(ctx);
 }
@@ -2843,7 +2859,28 @@ TEST_CASE("I", "[I]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "I", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "I", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 I", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 >R I", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "1 2 >R I", FORTH_SUCCESS, {1, 2});
+    evalTestSection(ctx, "1 2 >R >R I", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "1 >R 2 >R I", FORTH_SUCCESS, {2});
+
+    forth_destroy_context(ctx);
+}
+
+TEST_CASE("i_tick", "[i_tick]")
+{
+    forth_context* ctx = forth_create_context();
+
+    evalTestSection(ctx, "I'", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 >R I'", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 >R 2 >R I'", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "1 >R 2 >R 3 >R I'", FORTH_SUCCESS, {2});
+    evalTestSection(ctx, "1 >R I'", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 2 >R I'", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 2 >R >R I'", FORTH_SUCCESS, {2});
+    evalTestSection(ctx, "1 >R 2 >R I'", FORTH_SUCCESS, {1});
 
     forth_destroy_context(ctx);
 }
@@ -2923,7 +2960,16 @@ TEST_CASE("J", "[J]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "J", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "J", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 >R J", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 >R 2 >R J", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 >R 2 >R 3 >R J", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "1 >R 2 >R 3 >R 4 >R J", FORTH_SUCCESS, {2});
+    evalTestSection(ctx, "1 2 >R >R J", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 2 3 >R >R >R J", FORTH_SUCCESS, {3});
+    evalTestSection(ctx, ": GD3 DO 1 0 DO J LOOP LOOP ; 4 1 GD3", FORTH_SUCCESS, {1, 2, 3});
+    evalTestSection(ctx, ": GD4 DO 1 0 DO J LOOP -1 +LOOP ; 1 4 GD4", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, ": GD4 DO 1 0 DO J LOOP -1 +LOOP ; -1 2 GD4", FORTH_FAILURE, {}, "Unimplemented\n");
 
     forth_destroy_context(ctx);
 }
@@ -3592,7 +3638,11 @@ TEST_CASE("r_from", "[r_from]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "R>", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "R>", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 >R R>", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, "1 2 >R R>", FORTH_SUCCESS, {1, 2});
+    evalTestSection(ctx, "1 >R 2 >R R> R>", FORTH_SUCCESS, {2, 1});
+    evalTestSection(ctx, "1 2 >R >R R> R>", FORTH_SUCCESS, {1, 2});
 
     forth_destroy_context(ctx);
 }
@@ -4139,7 +4189,10 @@ TEST_CASE("u_dot", "[u_dot]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "U.", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "U.", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 U.", FORTH_SUCCESS, {}, "1 ");
+    evalTestSection(ctx, "1 2 U.", FORTH_SUCCESS, {1}, "2 ");
+    evalTestSection(ctx, "-1 U.", FORTH_SUCCESS, {}, (std::to_string((forth_uint)-1) + " ").c_str());
 
     forth_destroy_context(ctx);
 }
