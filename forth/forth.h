@@ -200,9 +200,9 @@ int forth_add_c_word(forth_context* ctx, const char* name, forth_c_func fn);
 #define FORTH_LOG(_ctx_, _fmt_, ...) \
 { \
     if (ctx && ctx->log) \
-        ctx->log(_ctx_, _fmt_, __VA_ARGS__); \
+        ctx->log(_ctx_, _fmt_, ##__VA_ARGS__); \
     else \
-        printf(_fmt_, __VA_ARGS__); \
+        printf(_fmt_, ##__VA_ARGS__); \
 }
 
 //---------------------------------------------------------------------------
