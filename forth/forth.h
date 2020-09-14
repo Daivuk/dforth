@@ -1016,7 +1016,7 @@ static int forthi_interpret(forth_context* ctx)
 {
     const char* token;
     size_t token_len;
-    while (token = forthi_get_next_token(ctx, &token_len))
+    while ((token = forthi_get_next_token(ctx, &token_len)))
     {
         if (forthi_interpret_token(ctx, token, token_len) == FORTH_FAILURE)
             return FORTH_FAILURE;
