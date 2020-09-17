@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 project(forth)
+set(CMAKE_CXX_STANDARD 11)
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 file(GLOB inc_files forth/*.*)
 file(GLOB src_files src/*.*)
