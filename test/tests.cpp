@@ -141,7 +141,7 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
     evalTest(ctx, "1 2 . . ", FORTH_SUCCESS, {}, "2 1 ");
     evalTest(ctx, "1 2 SWAP . . ", FORTH_SUCCESS, {}, "1 2 ");
     evalTest(ctx, "2 10 4 - SWAP / .", FORTH_SUCCESS, {}, "3 ");
-    //evalTest(ctx, ": MY.S CR 'S SO @ 2- DO I @ . -2 +LOOP ;", FORTH_SUCCESS, {});
+    //evalTest(ctx, ": MY.S CR 'S S0 @ 2- DO I @ . -2 +LOOP ;", FORTH_SUCCESS, {}); // print stack. Can't implement 'S and S0 because our stack is not in the main program memory, and goes up instead of going down
     // ( 1.)
     evalTest(ctx, ": flip-3-items ( n1 n2 n3 -- n3 n2 n1) SWAP ROT ;", FORTH_SUCCESS, {});
     evalTest(ctx, "1 2 3 flip-3-items", FORTH_SUCCESS, {3, 2, 1});
@@ -240,7 +240,13 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
     evalTest(ctx, "600 COMMISSION .", FORTH_SUCCESS, {}, "50 ");
     evalTest(ctx, "450 COMMISSION .", FORTH_SUCCESS, {}, "45 ");
     evalTest(ctx, "50 COMMISSION .", FORTH_SUCCESS, {}, "5 ");
-    // TODO: */ */MOD
+    evalTest(ctx, ": % 100 */ ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "225 32 % .", FORTH_SUCCESS, {}, "72 ");
+    evalTest(ctx, "2000 34 100 */ .", FORTH_SUCCESS, {}, "680 ");
+    evalTest(ctx, ": R% 10 */ 5 + 10 / ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "227 32 R% .", FORTH_SUCCESS, {}, "73 ");
+    evalTest(ctx, "7105 150 12250 */ .", FORTH_SUCCESS, {}, "87 ");
+    evalTest(ctx, "5145 150 12250 */ .", FORTH_SUCCESS, {}, "63 ");
 
     // Chapter 6
     evalTest(ctx, ": TEST 10 0 DO CR .\" Hello \" LOOP ;", FORTH_SUCCESS, {}, "");
@@ -251,9 +257,103 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
     evalTest(ctx, "SAMPLE", FORTH_SUCCESS, {}, "-250 -249 -248 -247 -246 -245 -244 ");
     evalTest(ctx, ": MULTIPLICATIONS CR 11 1 DO DUP I * . LOOP DROP ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "7 MULTIPLICATIONS", FORTH_SUCCESS, {}, "\n7 14 21 28 35 42 49 56 63 70 ");
-    //evalTest(ctx, ": COMPOUND ( amt int -- )\n   SWAP 21 1 DO .\" YEAR \" I . 3 SPACES\n    2DUP R% + DUP .\" BALANCE \" . CR LOOP 2DROP ;", FORTH_SUCCESS, {}, "");
-    //evalTest(ctx, "1000 6 COMPOUND", FORTH_SUCCESS, {}, "");
-
+    evalTest(ctx, ": COMPOUND ( amt int -- )\n   SWAP 21 1 DO .\" YEAR \" I . 3 SPACES\n    2DUP R% + DUP .\" BALANCE \" . CR LOOP 2DROP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "1000 6 COMPOUND", FORTH_SUCCESS, {}, 
+            "YEAR 1    BALANCE 1060 \n"
+            "YEAR 2    BALANCE 1124 \n"
+            "YEAR 3    BALANCE 1191 \n"
+            "YEAR 4    BALANCE 1262 \n"
+            "YEAR 5    BALANCE 1338 \n"
+            "YEAR 6    BALANCE 1418 \n"
+            "YEAR 7    BALANCE 1503 \n"
+            "YEAR 8    BALANCE 1593 \n"
+            "YEAR 9    BALANCE 1689 \n"
+            "YEAR 10    BALANCE 1790 \n"
+            "YEAR 11    BALANCE 1897 \n"
+            "YEAR 12    BALANCE 2011 \n"
+            "YEAR 13    BALANCE 2132 \n"
+            "YEAR 14    BALANCE 2260 \n"
+            "YEAR 15    BALANCE 2396 \n"
+            "YEAR 16    BALANCE 2540 \n"
+            "YEAR 17    BALANCE 2692 \n"
+            "YEAR 18    BALANCE 2854 \n"
+            "YEAR 19    BALANCE 3025 \n"
+            "YEAR 20    BALANCE 3207 \n");
+    evalTest(ctx, ": RECTANGLE 256 0 DO I 16 MOD 0= IF\n    CR THEN .\" *\" LOOP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "RECTANGLE", FORTH_SUCCESS, {}, 
+        "\n****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************\n"
+        "****************");
+    evalTest(ctx, ": POEM CR 11 1 DO I . .\" LITTLE \" I 3 MOD 0= IF .\" INDIANS \" CR THEN LOOP .\" INDIAN BOYS. \" ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "POEM", FORTH_SUCCESS, {}, "\n"
+        "1 LITTLE 2 LITTLE 3 LITTLE INDIANS \n"
+        "4 LITTLE 5 LITTLE 6 LITTLE INDIANS \n"
+        "7 LITTLE 8 LITTLE 9 LITTLE INDIANS \n"
+        "10 LITTLE INDIAN BOYS. ");
+    evalTest(ctx, ": TABLE CR 11 1 DO I MULTIPLICATIONS LOOP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "TABLE", FORTH_SUCCESS, {}, "\n"
+        "\n1 2 3 4 5 6 7 8 9 10 "
+        "\n2 4 6 8 10 12 14 16 18 20 "
+        "\n3 6 9 12 15 18 21 24 27 30 "
+        "\n4 8 12 16 20 24 28 32 36 40 "
+        "\n5 10 15 20 25 30 35 40 45 50 "
+        "\n6 12 18 24 30 36 42 48 54 60 "
+        "\n7 14 21 28 35 42 49 56 63 70 "
+        "\n8 16 24 32 40 48 56 64 72 80 "
+        "\n9 18 27 36 45 54 63 72 81 90 "
+        "\n10 20 30 40 50 60 70 80 90 100 ");
+    evalTest(ctx, ": TABLE2 CR 11 1 DO 11 1 DO I J * 5 U.R LOOP CR LOOP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "TABLE2", FORTH_SUCCESS, {},
+        "\n    1    2    3    4    5    6    7    8    9   10"
+        "\n    2    4    6    8   10   12   14   16   18   20"
+        "\n    3    6    9   12   15   18   21   24   27   30"
+        "\n    4    8   12   16   20   24   28   32   36   40"
+        "\n    5   10   15   20   25   30   35   40   45   50"
+        "\n    6   12   18   24   30   36   42   48   54   60"
+        "\n    7   14   21   28   35   42   49   56   63   70"
+        "\n    8   16   24   32   40   48   56   64   72   80"
+        "\n    9   18   27   36   45   54   63   72   81   90"
+        "\n   10   20   30   40   50   60   70   80   90  100\n");
+    evalTest(ctx, ": PENTAJUMPS 50 0 DO I . 5 +LOOP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "PENTAJUMPS", FORTH_SUCCESS, {}, "0 5 10 15 20 25 30 35 40 45 ");
+    evalTest(ctx, ": FALLING -10 0 DO I . -1 +LOOP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "FALLING", FORTH_SUCCESS, {}, "0 -1 -2 -3 -4 -5 -6 -7 -8 -9 -10 ");
+    evalTest(ctx, ": INC-COUNT DO I . DUP +LOOP DROP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "1 5 0 INC-COUNT", FORTH_SUCCESS, {}, "0 1 2 3 4 ");
+    evalTest(ctx, "2 5 0 INC-COUNT", FORTH_SUCCESS, {}, "0 2 4 ");
+    evalTest(ctx, "-3 -10 10 INC-COUNT", FORTH_SUCCESS, {}, "10 7 4 1 -2 -5 -8 ");
+    evalTest(ctx, ": DOUBLING 32767 1 DO I . I +LOOP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "DOUBLING", FORTH_SUCCESS, {}, "1 2 4 8 16 32 64 128 256 512 1024 2048 4096 8192 16384 ");
+    evalTest(ctx, ": DOUBLED 6 1000 21 1 DO CR .\" YEAR \" I 2 U.R 2DUP R% + DUP .\"     BALANCE \" . DUP 2000 > IF CR CR .\" MORE THAN DOUBLED IN \" I . .\" YEARS \" LEAVE THEN LOOP 2DROP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "DOUBLED", FORTH_SUCCESS, {}, "\n"
+        "YEAR  1    BALANCE 1060 \n"
+        "YEAR  2    BALANCE 1124 \n"
+        "YEAR  3    BALANCE 1191 \n"
+        "YEAR  4    BALANCE 1262 \n"
+        "YEAR  5    BALANCE 1338 \n"
+        "YEAR  6    BALANCE 1418 \n"
+        "YEAR  7    BALANCE 1503 \n"
+        "YEAR  8    BALANCE 1593 \n"
+        "YEAR  9    BALANCE 1689 \n"
+        "YEAR 10    BALANCE 1790 \n"
+        "YEAR 11    BALANCE 1897 \n"
+        "YEAR 12    BALANCE 2011 \n"
+        "\n"
+        "MORE THAN DOUBLED IN 12 YEARS "
+    );
 
     forth_destroy_context(ctx);
 }
@@ -351,6 +451,11 @@ TEST_CASE("star_slash", "[star_slash]")
     forth_context* ctx = forth_create_context();
 
     evalTestSection(ctx, "*/", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 */", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 */", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 */", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 2 3 4 */", FORTH_SUCCESS, {1, 1});
+    evalTestSection(ctx, "1 2 -3 */", FORTH_SUCCESS, {-1});
 
     forth_destroy_context(ctx);
 }
@@ -359,7 +464,15 @@ TEST_CASE("star_slash_mod", "[star_slash_mod]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "*/MOD", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "*/MOD", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 */MOD", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 */MOD", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 3 */MOD", FORTH_SUCCESS, {2, 0});
+    evalTestSection(ctx, "1 0 1 */MOD", FORTH_SUCCESS, {0, 0});
+    evalTestSection(ctx, "1 1 1 */MOD", FORTH_SUCCESS, {0, 1});
+    evalTestSection(ctx, "1 2 1 */MOD", FORTH_SUCCESS, {0, 2});
+    evalTestSection(ctx, "1 2 2 */MOD", FORTH_SUCCESS, {0, 1});
+    evalTestSection(ctx, "1 7 3 */MOD", FORTH_SUCCESS, {1, 2});
 
     forth_destroy_context(ctx);
 }
@@ -404,9 +517,27 @@ TEST_CASE("plus_field", "[plus_field]")
 
 TEST_CASE("plus_loop", "[plus_loop]")
 {
-    forth_context* ctx = forth_create_context();
+    forth_context* ctx = forth_create_context(-1, 6, -1, -1);
 
-    evalTestSection(ctx, "+LOOP", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "+LOOP", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, ": STARS 0 DO 42 EMIT +LOOP ; 5 STARS", FORTH_FAILURE, {}, "*Stack underflow\n");
+    evalTestSection(ctx, ": STARS 0 DO 42 EMIT 1 +LOOP ; 5 STARS", FORTH_SUCCESS, {}, "*****");
+    evalTestSection(ctx, ": COUNT 25 0 DO I . 5 +LOOP ; COUNT", FORTH_SUCCESS, {}, "0 5 10 15 20 ");
+    evalTestSection(ctx, ": REVCOUNT -13 1 DO I . -3 +LOOP ; REVCOUNT", FORTH_SUCCESS, {}, "1 -2 -5 -8 -11 ");
+    evalTestSection(ctx, ": COUNT 4 4 DO I -1 +LOOP ; COUNT", FORTH_SUCCESS, {4});
+    evalTestSection(ctx, ": COUNT 1 4 DO I -1 +LOOP ; COUNT", FORTH_SUCCESS, {4, 3, 2, 1});
+    evalTestSection(ctx, ": COUNT 4 1 DO I -1 +LOOP ; COUNT", FORTH_FAILURE, {}, "Stack overflow\n");
+    evalTestSection(ctx, ": COUNT 4 1 DO I 0 +LOOP ; COUNT", FORTH_FAILURE, {}, "Stack overflow\n");
+    evalTestSection(ctx, ": COUNT 0 0 DO I 0 +LOOP ; COUNT", FORTH_FAILURE, {}, "Stack overflow\n");
+    evalTestSection(ctx, ": COUNT 1 4 DO I 0 +LOOP ; COUNT", FORTH_FAILURE, {}, "Stack overflow\n");
+    evalTestSection(ctx, ": COUNT 4 1 DO I 1 +LOOP ; COUNT", FORTH_SUCCESS, {1, 2, 3});
+    evalTestSection(ctx, ": COUNT 4 4 DO I 1 +LOOP ; COUNT", FORTH_FAILURE, {}, "Stack overflow\n");
+    evalTestSection(ctx, ": COUNT 2 -1 DO I -1 +LOOP ; COUNT", FORTH_FAILURE, {}, "Stack overflow\n");
+    evalTestSection(ctx, ": COUNT -1 2 DO I -1 +LOOP ; COUNT", FORTH_SUCCESS, {2, 1, 0, -1});
+    evalTestSection(ctx, ": COUNT 2 -1 DO I 0 +LOOP ; COUNT", FORTH_FAILURE, {}, "Stack overflow\n");
+    evalTestSection(ctx, ": COUNT -1 2 DO I 0 +LOOP ; COUNT", FORTH_FAILURE, {}, "Stack overflow\n");
+    evalTestSection(ctx, ": COUNT -1 2 DO I 1 +LOOP ; COUNT", FORTH_FAILURE, {}, "Stack overflow\n");
+    evalTestSection(ctx, ": COUNT 2 -1 DO I -1 +LOOP ; COUNT", FORTH_SUCCESS, {-1, 0, 1});
 
     forth_destroy_context(ctx);
 }
@@ -1268,9 +1399,13 @@ TEST_CASE("BASE", "[BASE]")
 
 TEST_CASE("BEGIN", "[BEGIN]")
 {
-    forth_context* ctx = forth_create_context();
+    forth_context* ctx = forth_create_context(-1, 6, -1, -1);
 
-    evalTestSection(ctx, "BEGIN", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "BEGIN", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, ": TEST BEGIN -1 UNTIL ; TEST", FORTH_SUCCESS, {}, "");
+    evalTestSection(ctx, ": TEST BEGIN 1 0 UNTIL ; TEST", FORTH_FAILURE, {}, "Stack overflow\n");
+    //evalTestSection(ctx, ": STARS 0 DO 4 2 DO 42 EMIT LOOP LOOP ; 3 STARS", FORTH_SUCCESS, {}, "******");
+    //evalTestSection(ctx, ": STARS 0 DO 42 EMIT LOOP .\" Carrots\"; 5 STARS", FORTH_SUCCESS, {}, "*****Carrots");
 
     forth_destroy_context(ctx);
 }
@@ -2968,8 +3103,8 @@ TEST_CASE("J", "[J]")
     evalTestSection(ctx, "1 2 >R >R J", FORTH_FAILURE, {}, "Return stack underflow\n");
     evalTestSection(ctx, "1 2 3 >R >R >R J", FORTH_SUCCESS, {3});
     evalTestSection(ctx, ": GD3 DO 1 0 DO J LOOP LOOP ; 4 1 GD3", FORTH_SUCCESS, {1, 2, 3});
-    evalTestSection(ctx, ": GD4 DO 1 0 DO J LOOP -1 +LOOP ; 1 4 GD4", FORTH_FAILURE, {}, "Unimplemented\n");
-    evalTestSection(ctx, ": GD4 DO 1 0 DO J LOOP -1 +LOOP ; -1 2 GD4", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, ": GD4 DO 1 0 DO J LOOP -1 +LOOP ; 1 4 GD4", FORTH_SUCCESS, {4, 3, 2, 1});
+    evalTestSection(ctx, ": GD4 DO 1 0 DO J LOOP -1 +LOOP ; -1 2 GD4", FORTH_SUCCESS, {2, 1, 0, -1});
 
     forth_destroy_context(ctx);
 }
@@ -3221,7 +3356,11 @@ TEST_CASE("LEAVE", "[LEAVE]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "LEAVE", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "LEAVE", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 >R LEAVE", FORTH_FAILURE, {}, "Return stack underflow\n");
+    evalTestSection(ctx, "1 >R 2 >R LEAVE R> R>", FORTH_SUCCESS, {1, 1});
+    evalTestSection(ctx, ": TEST DO I LOOP ; 5 1 TEST", FORTH_SUCCESS, {1, 2, 3, 4});
+    evalTestSection(ctx, ": TEST DO I DUP 3 = IF LEAVE THEN LOOP ; 5 1 TEST", FORTH_SUCCESS, {1, 2, 3});
 
     forth_destroy_context(ctx);
 }
@@ -3611,7 +3750,7 @@ TEST_CASE("QUIT", "[QUIT]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "QUIT", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "QUIT", FORTH_FAILURE, {}, "");
 
     forth_destroy_context(ctx);
 }
@@ -3705,7 +3844,7 @@ TEST_CASE("REPEAT", "[REPEAT]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "REPEAT", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "REPEAT", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
 
     forth_destroy_context(ctx);
 }
@@ -4201,7 +4340,13 @@ TEST_CASE("u_dot_r", "[u_dot_r]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "U.R", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "U.R", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 U.R", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 U.R", FORTH_SUCCESS, {}, " 1");
+    evalTestSection(ctx, "1 2 3 U.R", FORTH_SUCCESS, {1}, "  2");
+    evalTestSection(ctx, "-1 2 U.R", FORTH_SUCCESS, {}, (std::to_string((forth_uint)-1)).c_str());
+    evalTestSection(ctx, "456 10 U.R", FORTH_SUCCESS, {}, "       456");
+    evalTestSection(ctx, "4 -1 U.R", FORTH_SUCCESS, {}, "4");
 
     forth_destroy_context(ctx);
 }
@@ -4264,7 +4409,10 @@ TEST_CASE("UNTIL", "[UNTIL]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "UNTIL", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "UNTIL", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, ": GI4 BEGIN DUP 1+ DUP 5 > UNTIL ; 3 GI4", FORTH_SUCCESS, {3, 4, 5, 6});
+    evalTestSection(ctx, ": GI4 BEGIN DUP 1+ DUP 5 > UNTIL ; 5 GI4", FORTH_SUCCESS, {5, 6});
+    evalTestSection(ctx, ": GI4 BEGIN DUP 1+ DUP 5 > UNTIL ; 6 GI4", FORTH_SUCCESS, {6, 7});
 
     forth_destroy_context(ctx);
 }
@@ -4318,7 +4466,16 @@ TEST_CASE("WHILE", "[WHILE]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "WHILE", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "WHILE", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, ": GI3 BEGIN DUP 5 < WHILE DUP 1+ REPEAT ; 0 GI3", FORTH_SUCCESS, {0, 1, 2, 3, 4, 5});
+    evalTestSection(ctx, ": GI3 BEGIN DUP 5 < WHILE DUP 1+ REPEAT ; 4 GI3", FORTH_SUCCESS, {4, 5});
+    evalTestSection(ctx, ": GI3 BEGIN DUP 5 < WHILE DUP 1+ REPEAT ; 5 GI3", FORTH_SUCCESS, {5});
+    evalTestSection(ctx, ": GI3 BEGIN DUP 5 < WHILE DUP 1+ REPEAT ; 6 GI3", FORTH_SUCCESS, {6});
+    //evalTestSection(ctx, ": GI5 BEGIN DUP 2 > WHILE DUP 5 < WHILE DUP 1+ REPEAT 123 ELSE 345 THEN ; 1 GI5", FORTH_SUCCESS, {1, 345});
+    //evalTestSection(ctx, ": GI5 BEGIN DUP 2 > WHILE DUP 5 < WHILE DUP 1+ REPEAT 123 ELSE 345 THEN ; 2 GI5", FORTH_SUCCESS, {2, 345});
+    //evalTestSection(ctx, ": GI5 BEGIN DUP 2 > WHILE DUP 5 < WHILE DUP 1+ REPEAT 123 ELSE 345 THEN ; 3 GI5", FORTH_SUCCESS, {3, 4, 5, 123});
+    //evalTestSection(ctx, ": GI5 BEGIN DUP 2 > WHILE DUP 5 < WHILE DUP 1+ REPEAT 123 ELSE 345 THEN ; 4 GI5", FORTH_SUCCESS, {4, 5, 123});
+    //evalTestSection(ctx, ": GI5 BEGIN DUP 2 > WHILE DUP 5 < WHILE DUP 1+ REPEAT 123 ELSE 345 THEN ; 5 GI5", FORTH_SUCCESS, {5, 123});
 
     forth_destroy_context(ctx);
 }
