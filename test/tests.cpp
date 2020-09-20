@@ -113,27 +113,51 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
     evalTest(ctx, "17 5 + .", FORTH_SUCCESS, {}, "22 ");
     evalTest(ctx, "7 8 * .", FORTH_SUCCESS, {}, "56 ");
     evalTest(ctx, "21 4 / .", FORTH_SUCCESS, {}, "5 ");
-    evalTest(ctx, "17 12 * 4 + .", FORTH_SUCCESS, {}, "208 ");
+    evalTest(ctx, "17 3 * 4 + .", FORTH_SUCCESS, {}, "55 ");
     evalTest(ctx, "3 9 + 4 6 + * .", FORTH_SUCCESS, {}, "120 ");
     evalTest(ctx, ": YARDS>IN   36 * ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, ": FT>IN   12 * ;", FORTH_SUCCESS, {}, "");
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, "3 YARDS>IN .", FORTH_SUCCESS, {}, "108 ");
+#else
     evalTest(ctx, "10 YARDS>IN .", FORTH_SUCCESS, {}, "360 ");
+#endif
     evalTest(ctx, "2 FT>IN .", FORTH_SUCCESS, {}, "24 ");
     evalTest(ctx, ": YARDS   36 * ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, ": FEET   12 * ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, ": INCHES ;", FORTH_SUCCESS, {}, "");
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, "5 YARDS 2 FEET + 9 INCHES + .", FORTH_SUCCESS, {}, "-43 ");
+#else
     evalTest(ctx, "10 YARDS 2 FEET + 9 INCHES + .", FORTH_SUCCESS, {}, "393 ");
+#endif
     evalTest(ctx, ": YARD   YARDS ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, ": FOOT   FEET ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, ": INCH   INCHES ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "1 YARD  2 FEET +  1 INCH + .", FORTH_SUCCESS, {}, "61 ");
     evalTest(ctx, "2 YARDS  1 FOOT + .", FORTH_SUCCESS, {}, "84 ");
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, "17 20 + 132 + 3 + 9 + .", FORTH_SUCCESS, {}, "-75 ");
+#else
     evalTest(ctx, "17 20 + 132 + 3 + 9 + .", FORTH_SUCCESS, {}, "181 ");
+#endif
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, "17 20 132 3 9 + + + + .", FORTH_SUCCESS, {}, "-75 ");
+#else
     evalTest(ctx, "17 20 132 3 9 + + + + .", FORTH_SUCCESS, {}, "181 ");
+#endif
     evalTest(ctx, ": 5#SUM   + + + + ;", FORTH_SUCCESS, {}, "");
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, "17 20 132 3 9 5#SUM .", FORTH_SUCCESS, {}, "-75 ");
+#else
     evalTest(ctx, "17 20 132 3 9 5#SUM .", FORTH_SUCCESS, {}, "181 ");
+#endif
     evalTest(ctx, ": FLIGHT-DISTANCE   + * ;", FORTH_SUCCESS, {}, "");
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, "5 6 25 FLIGHT-DISTANCE .", FORTH_SUCCESS, {}, "-101 ");
+#else
     evalTest(ctx, "5 600 25 FLIGHT-DISTANCE .", FORTH_SUCCESS, {}, "3125 ");
+#endif
     evalTest(ctx, "22 4 /MOD . . ", FORTH_SUCCESS, {}, "5 2 ");
     evalTest(ctx, ": QUARTERS   4 /MOD . .\" ONES AND \" . .\" QUARTERS \" ;", FORTH_SUCCESS, {});
     evalTest(ctx, "22 QUARTERS", FORTH_SUCCESS, {}, "5 ONES AND 2 QUARTERS ");
@@ -198,7 +222,11 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
     evalTest(ctx, "11 ?FULL", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "12 ?FULL", FORTH_SUCCESS, {}, "It's full ");
     evalTest(ctx, ": ?TOO-HOT 220 > IF .\" DANGER -- Reduce heat \" THEN  ;", FORTH_SUCCESS, {}, "");
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, "255 ?TOO-HOT", FORTH_SUCCESS, {}, "DANGER -- Reduce heat ");
+#else
     evalTest(ctx, "290 ?TOO-HOT", FORTH_SUCCESS, {}, "DANGER -- Reduce heat ");
+#endif
     evalTest(ctx, "130 ?TOO-HOT", FORTH_SUCCESS, {}, "");
     evalTest(ctx, ": EGGSIZE DUP 18 < IF .\" REJECT \"       ELSE"
                   "          DUP 21 < IF .\" SMALL \"        ELSE"
@@ -236,28 +264,69 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
     evalTest(ctx, ": DIFFERENCE - ABS ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "52 37 DIFFERENCE .", FORTH_SUCCESS, {}, "15 ");
     evalTest(ctx, "37 52 DIFFERENCE .", FORTH_SUCCESS, {}, "15 ");
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, ": COMMISSION 10 / 5 MIN ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "60 COMMISSION .", FORTH_SUCCESS, {}, "5 ");
+    evalTest(ctx, "45 COMMISSION .", FORTH_SUCCESS, {}, "4 ");
+    evalTest(ctx, "5 COMMISSION .", FORTH_SUCCESS, {}, "0 ");
+#else
     evalTest(ctx, ": COMMISSION 10 / 50 MIN ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "600 COMMISSION .", FORTH_SUCCESS, {}, "50 ");
     evalTest(ctx, "450 COMMISSION .", FORTH_SUCCESS, {}, "45 ");
     evalTest(ctx, "50 COMMISSION .", FORTH_SUCCESS, {}, "5 ");
+#endif
     evalTest(ctx, ": % 100 */ ;", FORTH_SUCCESS, {}, "");
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, "225 32 % .", FORTH_SUCCESS, {}, "-10 ");
+    evalTest(ctx, "2000 34 100 */ .", FORTH_SUCCESS, {}, "-17 ");
+#else
     evalTest(ctx, "225 32 % .", FORTH_SUCCESS, {}, "72 ");
     evalTest(ctx, "2000 34 100 */ .", FORTH_SUCCESS, {}, "680 ");
+#endif
     evalTest(ctx, ": R% 10 */ 5 + 10 / ;", FORTH_SUCCESS, {}, "");
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, "25 20 10 */ .", FORTH_SUCCESS, {}, "50 ");
+#else
     evalTest(ctx, "227 32 R% .", FORTH_SUCCESS, {}, "73 ");
     evalTest(ctx, "7105 150 12250 */ .", FORTH_SUCCESS, {}, "87 ");
     evalTest(ctx, "5145 150 12250 */ .", FORTH_SUCCESS, {}, "63 ");
+#endif
 
     // Chapter 6
     evalTest(ctx, ": TEST 10 0 DO CR .\" Hello \" LOOP ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "TEST", FORTH_SUCCESS, {}, "\nHello \nHello \nHello \nHello \nHello \nHello \nHello \nHello \nHello \nHello ");
     evalTest(ctx, ": DECADE 10 0 DO I . LOOP ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "DECADE", FORTH_SUCCESS, {}, "0 1 2 3 4 5 6 7 8 9 ");
+#ifndef FORTH_INT_SIZE_8_BITS
     evalTest(ctx, ": SAMPLE -243 -250 DO I . LOOP ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "SAMPLE", FORTH_SUCCESS, {}, "-250 -249 -248 -247 -246 -245 -244 ");
+#endif
     evalTest(ctx, ": MULTIPLICATIONS CR 11 1 DO DUP I * . LOOP DROP ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "7 MULTIPLICATIONS", FORTH_SUCCESS, {}, "\n7 14 21 28 35 42 49 56 63 70 ");
     evalTest(ctx, ": COMPOUND ( amt int -- )\n   SWAP 21 1 DO .\" YEAR \" I . 3 SPACES\n    2DUP R% + DUP .\" BALANCE \" . CR LOOP 2DROP ;", FORTH_SUCCESS, {}, "");
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, "10 6 COMPOUND", FORTH_SUCCESS, {}, 
+            "YEAR 1    BALANCE 11 \n"
+            "YEAR 2    BALANCE 12 \n"
+            "YEAR 3    BALANCE 13 \n"
+            "YEAR 4    BALANCE 14 \n"
+            "YEAR 5    BALANCE 15 \n"
+            "YEAR 6    BALANCE 16 \n"
+            "YEAR 7    BALANCE 17 \n"
+            "YEAR 8    BALANCE 18 \n"
+            "YEAR 9    BALANCE 19 \n"
+            "YEAR 10    BALANCE 20 \n"
+            "YEAR 11    BALANCE 21 \n"
+            "YEAR 12    BALANCE 22 \n"
+            "YEAR 13    BALANCE 23 \n"
+            "YEAR 14    BALANCE 24 \n"
+            "YEAR 15    BALANCE 25 \n"
+            "YEAR 16    BALANCE 27 \n"
+            "YEAR 17    BALANCE 29 \n"
+            "YEAR 18    BALANCE 31 \n"
+            "YEAR 19    BALANCE 33 \n"
+            "YEAR 20    BALANCE 35 \n");
+#else
     evalTest(ctx, "1000 6 COMPOUND", FORTH_SUCCESS, {}, 
             "YEAR 1    BALANCE 1060 \n"
             "YEAR 2    BALANCE 1124 \n"
@@ -279,7 +348,8 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
             "YEAR 18    BALANCE 2854 \n"
             "YEAR 19    BALANCE 3025 \n"
             "YEAR 20    BALANCE 3207 \n");
-    evalTest(ctx, ": RECTANGLE 256 0 DO I 16 MOD 0= IF\n    CR THEN .\" *\" LOOP ;", FORTH_SUCCESS, {}, "");
+#endif
+    evalTest(ctx, ": RECTANGLE 255 0 DO I 16 MOD 0= IF\n    CR THEN .\" *\" 1 /LOOP ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "RECTANGLE", FORTH_SUCCESS, {}, 
         "\n****************\n"
         "****************\n"
@@ -296,7 +366,7 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
         "****************\n"
         "****************\n"
         "****************\n"
-        "****************");
+        "***************");
     evalTest(ctx, ": POEM CR 11 1 DO I . .\" LITTLE \" I 3 MOD 0= IF .\" INDIANS \" CR THEN LOOP .\" INDIAN BOYS. \" ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "POEM", FORTH_SUCCESS, {}, "\n"
         "1 LITTLE 2 LITTLE 3 LITTLE INDIANS \n"
@@ -335,8 +405,31 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
     evalTest(ctx, "1 5 0 INC-COUNT", FORTH_SUCCESS, {}, "0 1 2 3 4 ");
     evalTest(ctx, "2 5 0 INC-COUNT", FORTH_SUCCESS, {}, "0 2 4 ");
     evalTest(ctx, "-3 -10 10 INC-COUNT", FORTH_SUCCESS, {}, "10 7 4 1 -2 -5 -8 ");
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, ": DOUBLING 127 1 DO I . I +LOOP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "DOUBLING", FORTH_SUCCESS, {}, "1 2 4 8 16 32 64 ");
+#else
     evalTest(ctx, ": DOUBLING 32767 1 DO I . I +LOOP ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "DOUBLING", FORTH_SUCCESS, {}, "1 2 4 8 16 32 64 128 256 512 1024 2048 4096 8192 16384 ");
+#endif
+#if FORTH_INT_SIZE_8_BITS
+    evalTest(ctx, ": DOUBLED 6 10 21 1 DO CR .\" YEAR \" I 2 U.R 2DUP R% + DUP .\"     BALANCE \" . DUP 20 > IF CR CR .\" MORE THAN DOUBLED IN \" I . .\" YEARS \" LEAVE THEN LOOP 2DROP ;", FORTH_SUCCESS, {}, "");
+    evalTest(ctx, "DOUBLED", FORTH_SUCCESS, {}, "\n"
+        "YEAR  1    BALANCE 11 \n"
+        "YEAR  2    BALANCE 12 \n"
+        "YEAR  3    BALANCE 13 \n"
+        "YEAR  4    BALANCE 14 \n"
+        "YEAR  5    BALANCE 15 \n"
+        "YEAR  6    BALANCE 16 \n"
+        "YEAR  7    BALANCE 17 \n"
+        "YEAR  8    BALANCE 18 \n"
+        "YEAR  9    BALANCE 19 \n"
+        "YEAR 10    BALANCE 20 \n"
+        "YEAR 11    BALANCE 21 \n"
+        "\n"
+        "MORE THAN DOUBLED IN 11 YEARS "
+    );
+#else
     evalTest(ctx, ": DOUBLED 6 1000 21 1 DO CR .\" YEAR \" I 2 U.R 2DUP R% + DUP .\"     BALANCE \" . DUP 2000 > IF CR CR .\" MORE THAN DOUBLED IN \" I . .\" YEARS \" LEAVE THEN LOOP 2DROP ;", FORTH_SUCCESS, {}, "");
     evalTest(ctx, "DOUBLED", FORTH_SUCCESS, {}, "\n"
         "YEAR  1    BALANCE 1060 \n"
@@ -354,7 +447,8 @@ TEST_CASE("Starting FORTH", "[StartingForth]")
         "\n"
         "MORE THAN DOUBLED IN 12 YEARS "
     );
-
+#endif
+    
     forth_destroy_context(ctx);
 }
 
@@ -873,7 +967,11 @@ TEST_CASE("two_star", "[two_star]")
     evalTestSection(ctx, "0 2*", FORTH_SUCCESS, {0});
     evalTestSection(ctx, "-1 2*", FORTH_SUCCESS, {-2});
     evalTestSection(ctx, "1 2*", FORTH_SUCCESS, {2});
+#if FORTH_INT_SIZE_8_BITS
+    evalTestSection(ctx, "40 2*", FORTH_SUCCESS, {80});
+#else
     evalTestSection(ctx, "4000 2*", FORTH_SUCCESS, {8000});
+#endif
 
     forth_destroy_context(ctx);
 }
@@ -888,7 +986,11 @@ TEST_CASE("two_slash", "[two_slash]")
     evalTestSection(ctx, "0 2/", FORTH_SUCCESS, {0});
     evalTestSection(ctx, "-1 2/", FORTH_SUCCESS, {0});
     evalTestSection(ctx, "1 2/", FORTH_SUCCESS, {0});
+#if FORTH_INT_SIZE_8_BITS
+    evalTestSection(ctx, "40 2/", FORTH_SUCCESS, {20});
+#else
     evalTestSection(ctx, "4000 2/", FORTH_SUCCESS, {2000});
+#endif
 
     forth_destroy_context(ctx);
 }
@@ -1033,11 +1135,15 @@ TEST_CASE("two_variable", "[two_variable]")
 TEST_CASE("colon", "[colon]")
 {
     forth_context* ctx = forth_create_context();
-
+    
+#if FORTH_INT_SIZE_8_BITS
+    evalTestSection(ctx, ": foo 10 + ; 100 foo", FORTH_SUCCESS, {110});
+#else
     evalTestSection(ctx, ": foo 100 + ; 1000 foo", FORTH_SUCCESS, {1100});
+#endif
     evalTestSection(ctx, ": foo : bar ; ;", FORTH_FAILURE, {}, "Undefined word\n");
     evalTestSection(ctx, "foo foo1 foo foo2", FORTH_FAILURE, {}, "Undefined word\n");
-    evalTestSection(ctx, ": GDX 123 ; : GDX GDX 234 ; GDX", FORTH_SUCCESS, {123, 234});
+    evalTestSection(ctx, ": GDX 123 ; : GDX GDX 234 ; GDX", FORTH_SUCCESS, {123, (forth_int)234});
 
     //    forth::eval(ctx, ": print-stack-top  cr dup .\" The top of the stack is \" . cr .\" which looks like '\" dup emit .\" ' in ascii  \" ;");
     //forth::eval(ctx, "48 print-stack-top");
@@ -2245,8 +2351,10 @@ TEST_CASE("EXECUTE", "[EXECUTE]")
     forth_context* ctx = forth_create_context();
 
     evalTestSection(ctx, "EXECUTE", FORTH_FAILURE, {}, "Stack underflow\n");
+#ifndef FORTH_INT_SIZE_8_BITS
     evalTestSection(ctx, "-5 EXECUTE", FORTH_FAILURE, {}, "Invalid memory address\n");
     evalTestSection(ctx, "10000 EXECUTE", FORTH_FAILURE, {}, "Invalid memory address\n");
+#endif
     evalTestSection(ctx, "0 EXECUTE", FORTH_FAILURE, {}, "Unimplemented\n");
 
     forth_destroy_context(ctx);
@@ -2963,7 +3071,7 @@ TEST_CASE("HERE", "[HERE]")
     auto mem_pointer = ctx->memory_pointer;
     REQUIRE(forth_eval(ctx, "HERE") == FORTH_SUCCESS);
     REQUIRE(ctx->stack_pointer == 1);
-    REQUIRE(ctx->stack[0].int_value == mem_pointer);
+    REQUIRE(ctx->stack[0].pointer_value == mem_pointer);
     ctx->stack_pointer = 0;
 
     // Compiling a new WORD should increase the HERE cursor
@@ -2976,7 +3084,7 @@ TEST_CASE("HERE", "[HERE]")
     REQUIRE(forth_eval(ctx, "10 foo") == FORTH_SUCCESS);
     REQUIRE(forth_eval(ctx, "HERE") == FORTH_SUCCESS);
     REQUIRE(ctx->stack_pointer == 2);
-    REQUIRE(ctx->stack[1].int_value == here_after);
+    REQUIRE(ctx->stack[1].pointer_value == here_after);
     ctx->stack_pointer = 0;
 
     forth_destroy_context(ctx);
@@ -4392,7 +4500,7 @@ TEST_CASE("u_dot_r", "[u_dot_r]")
     evalTestSection(ctx, "1 2 U.R", FORTH_SUCCESS, {}, " 1");
     evalTestSection(ctx, "1 2 3 U.R", FORTH_SUCCESS, {1}, "  2");
     evalTestSection(ctx, "-1 2 U.R", FORTH_SUCCESS, {}, (std::to_string((forth_uint)-1)).c_str());
-    evalTestSection(ctx, "456 10 U.R", FORTH_SUCCESS, {}, "       456");
+    evalTestSection(ctx, "146 10 U.R", FORTH_SUCCESS, {}, "       146");
     evalTestSection(ctx, "4 -1 U.R", FORTH_SUCCESS, {}, "4");
 
     forth_destroy_context(ctx);

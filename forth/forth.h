@@ -599,15 +599,15 @@ static int forthi_push_cell(forth_context* ctx, forth_cell cell)
 
 static int forthi_push_int_number(forth_context* ctx, forth_int n)
 {
-    forth_cell cell;
+    forth_cell cell = {0};
     cell.int_value = n;
     return forthi_push_cell(ctx, cell);
 }
 
 static int forthi_push_double_length_uint(forth_context* ctx, forth_double_length_uint u)
 {
-    forth_cell cell1;
-    forth_cell cell2;
+    forth_cell cell1 = {0};
+    forth_cell cell2 = {0};
 
     cell1.uint_value = (forth_uint)u;
 #if FORTH_INT_SIZE_64_BITS
@@ -623,24 +623,30 @@ static int forthi_push_double_length_uint(forth_context* ctx, forth_double_lengt
 
 static forth_double_length_uint forthi_to_double_length_uint(forth_uint u1, forth_uint u2)
 {
-#if FORTH_INT_SIZE_64_BITS
-    return (forth_double_length_uint)u1;
-#else
+#if FORTH_INT_SIZE_8_BITS
     return (forth_double_length_uint)u1 |
-        (forth_double_length_uint)(u2 << (sizeof(forth_uint) * 8));
+        ((forth_double_length_uint)u2 << 8);
+#elif FORTH_INT_SIZE_16_BITS
+    return (forth_double_length_uint)u1 |
+        ((forth_double_length_uint)u2 << 16);
+#elif FORTH_INT_SIZE_32_BITS
+    return (forth_double_length_uint)u1 |
+        ((forth_double_length_uint)u2 << 32);
+#else // FORTH_INT_SIZE_64_BITS
+    return (forth_double_length_uint)u1;
 #endif
 }
 
 static int forthi_push_uint_number(forth_context* ctx, forth_uint u)
 {
-    forth_cell cell;
+    forth_cell cell = {0};
     cell.uint_value = u;
     return forthi_push_cell(ctx, cell);
 }
 
 static int forthi_push_pointer(forth_context* ctx, forth_pointer pointer)
 {
-    forth_cell cell;
+    forth_cell cell = {0};
     cell.pointer_value = pointer;
     return forthi_push_cell(ctx, cell);
 }
@@ -945,7 +951,7 @@ static int forthi_interpret_token(forth_context* ctx, const char* token, size_t 
         {
             if (ctx->state == FORTHI_STATE_INTERPRET)
             {
-                forthi_push_int_number(ctx, (forth_int)(memory_pointer + 1));
+                forthi_push_pointer(ctx, (forth_pointer)(memory_pointer + 1));
                 return forthi_word_EXECUTE(ctx);
             }
             else
@@ -1143,12 +1149,20 @@ static int forthi_word_plus_loop(forth_context* ctx)
 
         if (forthi_pop(ctx, 1) == FORTH_FAILURE)
             return FORTH_FAILURE;
-
+        
         forth_int i = ctx->return_stack[ctx->return_stack_pointer - 1].int_value;
+        forth_int prev_i = i;
         forth_int i_tick = ctx->return_stack[ctx->return_stack_pointer - 2].int_value;
         forth_int inc = ctx->stack[ctx->stack_pointer].int_value;
         forth_int diff = i_tick - i;
         i += inc;
+
+        if (inc > 0 && prev_i > i)
+        {
+            ctx->program_pointer += sizeof(forth_pointer);
+            return forthi_pop_return(ctx, 2);
+        }
+
         if ((diff > 0 && i < i_tick) || (diff <= 0 && i >= i_tick))
         {
             ctx->return_stack[ctx->return_stack_pointer - 1].int_value = i;
@@ -2481,7 +2495,7 @@ static int forthi_word_EXECUTE(forth_context* ctx)
         return FORTH_FAILURE;
 
     forthi_push_return_pointer(ctx, ctx->program_pointer);
-    ctx->program_pointer = (forth_pointer)ctx->stack[ctx->stack_pointer].int_value;
+    ctx->program_pointer = ctx->stack[ctx->stack_pointer].pointer_value;
     ctx->state = FORTHI_STATE_EXECUTE;
 
     while (ctx->return_stack_pointer > 0)
@@ -2988,7 +3002,7 @@ static int forthi_word_GET_ORDER(forth_context* ctx)
 
 static int forthi_word_HERE(forth_context* ctx)
 {
-    return forthi_push_int_number(ctx, ctx->memory_pointer);
+    return forthi_push_pointer(ctx, ctx->memory_pointer);
 }
 
 static int forthi_word_HEX(forth_context* ctx)
