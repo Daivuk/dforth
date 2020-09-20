@@ -238,6 +238,8 @@ static const char* forthi_read_text(forth_context* ctx, forth_int* len);
 // Stack
 static int forthi_push_cell(forth_context* ctx, forth_cell cell);
 static int forthi_push_int_number(forth_context* ctx, forth_int number);
+static int forthi_push_double_length_uint(forth_context* ctx, forth_double_length_uint u);
+static forth_double_length_uint forthi_to_double_length_uint(forth_uint u1, forth_uint u2);
 static int forthi_push_pointer(forth_context* ctx, forth_pointer pointer);
 static int forthi_pop(forth_context* ctx, int count = 1);
 forth_cell* forth_get_top(forth_context* ctx, int offset);
@@ -599,6 +601,33 @@ static int forthi_push_int_number(forth_context* ctx, forth_int n)
     forth_cell cell;
     cell.int_value = n;
     return forthi_push_cell(ctx, cell);
+}
+
+static int forthi_push_double_length_uint(forth_context* ctx, forth_double_length_uint u)
+{
+    forth_cell cell1;
+    forth_cell cell2;
+
+    cell1.uint_value = (forth_uint)u;
+#if FORTH_INT_SIZE_64_BITS
+    cell2.uint_value = 0;
+#else
+    cell2.uint_value = (forth_uint)(u >> (sizeof(forth_uint) * 8));
+#endif
+
+    if (forthi_push_cell(ctx, cell1) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+    return forthi_push_cell(ctx, cell2);
+}
+
+static forth_double_length_uint forthi_to_double_length_uint(forth_uint u1, forth_uint u2)
+{
+#if FORTH_INT_SIZE_64_BITS
+    return (forth_double_length_uint)u1;
+#else
+    return (forth_double_length_uint)u1 |
+        (forth_double_length_uint)(u2 << (sizeof(forth_uint) * 8));
+#endif
 }
 
 static int forthi_push_uint_number(forth_context* ctx, forth_uint u)
@@ -4013,6 +4042,34 @@ static int forthi_word_u_dot(forth_context* ctx)
     return FORTH_SUCCESS;
 }
 
+static int forthi_word_u_star(forth_context* ctx)
+{
+    if (forthi_pop(ctx, 2) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_uint u1 = ctx->stack[ctx->stack_pointer].uint_value;
+    forth_uint u2 = ctx->stack[ctx->stack_pointer + 1].uint_value;
+
+    forth_double_length_uint ud = (forth_double_length_uint)u1 * (forth_double_length_uint)u2;
+    return forthi_push_double_length_uint(ctx, ud);
+}
+
+static int forthi_word_u_slash_mod(forth_context* ctx)
+{
+    if (forthi_pop(ctx, 3) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_double_length_uint ud = forthi_to_double_length_uint(
+        ctx->stack[ctx->stack_pointer].uint_value,
+        ctx->stack[ctx->stack_pointer + 1].uint_value);
+    forth_double_length_uint u1 = (forth_double_length_uint)ctx->stack[ctx->stack_pointer + 2].uint_value;
+
+    if (forthi_push_uint_number(ctx, (forth_uint)(ud % u1)) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    return forthi_push_uint_number(ctx, (forth_uint)(ud / u1));
+}
+
 static int forthi_word_u_dot_r(forth_context* ctx)
 {
     if (forthi_pop(ctx, 2) == FORTH_FAILURE)
@@ -4026,14 +4083,24 @@ static int forthi_word_u_dot_r(forth_context* ctx)
 
 static int forthi_word_u_less_than(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 2) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_uint u1 = ctx->stack[ctx->stack_pointer].uint_value;
+    forth_uint u2 = ctx->stack[ctx->stack_pointer + 1].uint_value;
+
+    return forthi_push_int_number(ctx, u1 < u2 ? FORTH_TRUE : FORTH_FALSE);
 }
 
 static int forthi_word_u_greater_than(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    if (forthi_pop(ctx, 2) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_uint u1 = ctx->stack[ctx->stack_pointer].uint_value;
+    forth_uint u2 = ctx->stack[ctx->stack_pointer + 1].uint_value;
+
+    return forthi_push_int_number(ctx, u1 > u2 ? FORTH_TRUE : FORTH_FALSE);
 }
 
 static int forthi_word_u_m_star(forth_context* ctx)
@@ -4785,6 +4852,8 @@ static int forthi_defineStandardWords(forth_context* ctx)
     FORTHI_DEFINE_STANDARD_WORD("TUCK", forthi_word_TUCK);
     FORTHI_DEFINE_STANDARD_WORD("TYPE", forthi_word_TYPE);
     FORTHI_DEFINE_STANDARD_WORD("U.", forthi_word_u_dot);
+    FORTHI_DEFINE_STANDARD_WORD("U*", forthi_word_u_star);
+    FORTHI_DEFINE_STANDARD_WORD("U/MOD", forthi_word_u_slash_mod);
     FORTHI_DEFINE_STANDARD_WORD("U.R", forthi_word_u_dot_r);
     FORTHI_DEFINE_STANDARD_WORD("U<", forthi_word_u_less_than);
     FORTHI_DEFINE_STANDARD_WORD("U>", forthi_word_u_greater_than);

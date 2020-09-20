@@ -4336,6 +4336,34 @@ TEST_CASE("u_dot", "[u_dot]")
     forth_destroy_context(ctx);
 }
 
+TEST_CASE("u_star", "[u_star]")
+{
+    forth_context* ctx = forth_create_context();
+
+    evalTestSection(ctx, "U*", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 U*", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 U*", FORTH_SUCCESS, {2, 0});
+    evalTestSection(ctx, "1 2 3 U*", FORTH_SUCCESS, {1, 6, 0});
+
+    forth_destroy_context(ctx);
+}
+
+TEST_CASE("u_slash_mod", "[u_slash_mod]")
+{
+    forth_context* ctx = forth_create_context();
+
+    evalTestSection(ctx, "U/MOD", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 0 U/MOD", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 0 3 U/MOD", FORTH_SUCCESS, {1, 2, 0});
+    evalTestSection(ctx, "0 0 1 U/MOD", FORTH_SUCCESS, {0, 0});
+    evalTestSection(ctx, "1 0 1 U/MOD", FORTH_SUCCESS, {0, 1});
+    evalTestSection(ctx, "2 0 1 U/MOD", FORTH_SUCCESS, {0, 2});
+    evalTestSection(ctx, "2 0 2 U/MOD", FORTH_SUCCESS, {0, 1});
+    evalTestSection(ctx, "7 0 3 U/MOD", FORTH_SUCCESS, {1, 2});
+
+    forth_destroy_context(ctx);
+}
+
 TEST_CASE("u_dot_r", "[u_dot_r]")
 {
     forth_context* ctx = forth_create_context();
@@ -4355,7 +4383,16 @@ TEST_CASE("u_less_than", "[u_less_than]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "U<", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "U<", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 U<", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 U<", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "1 2 3 U<", FORTH_SUCCESS, {1, -1});
+    evalTestSection(ctx, "0 1 U<", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "1 2 U<", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "0 0 U<", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 1 U<", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 0 U<", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "2 1 U<", FORTH_SUCCESS, {0});
 
     forth_destroy_context(ctx);
 }
@@ -4363,8 +4400,17 @@ TEST_CASE("u_less_than", "[u_less_than]")
 TEST_CASE("u_greater_than", "[u_greater_than]")
 {
     forth_context* ctx = forth_create_context();
-
-    evalTestSection(ctx, "U>", FORTH_FAILURE, {}, "Unimplemented\n");
+    
+    evalTestSection(ctx, "U>", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 U>", FORTH_FAILURE, {}, "Stack underflow\n");
+    evalTestSection(ctx, "1 2 U>", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 2 3 U>", FORTH_SUCCESS, {1, 0});
+    evalTestSection(ctx, "0 1 U>", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 2 U>", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "0 0 U>", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 1 U>", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, "1 0 U>", FORTH_SUCCESS, {-1});
+    evalTestSection(ctx, "2 1 U>", FORTH_SUCCESS, {-1});
 
     forth_destroy_context(ctx);
 }
