@@ -542,6 +542,25 @@ TEST_CASE("plus_loop", "[plus_loop]")
     forth_destroy_context(ctx);
 }
 
+TEST_CASE("slash_loop", "[slash_loop]")
+{
+    forth_context* ctx = forth_create_context(-1, 6, -1, -1);
+
+    evalTestSection(ctx, "/LOOP", FORTH_FAILURE, {}, "Interpreting a compile-only word\n");
+    evalTestSection(ctx, ": STARS 0 DO 42 EMIT /LOOP ; 5 STARS", FORTH_FAILURE, {}, "*Stack underflow\n");
+    evalTestSection(ctx, ": STARS 0 DO 42 EMIT 1 /LOOP ; 5 STARS", FORTH_SUCCESS, {}, "*****");
+    evalTestSection(ctx, ": COUNT 25 0 DO I . 5 /LOOP ; COUNT", FORTH_SUCCESS, {}, "0 5 10 15 20 ");
+    evalTestSection(ctx, ": REVCOUNT 13 1 DO I -3 /LOOP ; REVCOUNT", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, ": REVCOUNT -13 1 DO I -3 /LOOP ; REVCOUNT", FORTH_SUCCESS, {1});
+    evalTestSection(ctx, ": COUNT 4 1 DO I 0 /LOOP ; COUNT", FORTH_FAILURE, {}, "Stack overflow\n");
+    evalTestSection(ctx, ": COUNT 0 0 DO I 0 /LOOP ; COUNT", FORTH_SUCCESS, {0});
+    evalTestSection(ctx, ": COUNT 1 4 DO I 0 /LOOP ; COUNT", FORTH_SUCCESS, {4});
+    evalTestSection(ctx, ": COUNT 4 1 DO I 1 /LOOP ; COUNT", FORTH_SUCCESS, {1, 2, 3});
+    evalTestSection(ctx, ": COUNT 4 4 DO I 1 /LOOP ; COUNT", FORTH_SUCCESS, {4});
+
+    forth_destroy_context(ctx);
+}
+
 TEST_CASE("plus_x_string", "[plus_x_string]")
 {
     forth_context* ctx = forth_create_context();

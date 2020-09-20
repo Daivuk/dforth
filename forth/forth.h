@@ -283,6 +283,7 @@ static int forthi_word_IF(forth_context* ctx);
 static int forthi_word_LOOP(forth_context* ctx);
 static int forthi_word_paren(forth_context* ctx);
 static int forthi_word_plus_loop(forth_context* ctx);
+static int forthi_word_slash_loop(forth_context* ctx);
 static int forthi_word_REPEAT(forth_context* ctx);
 static int forthi_word_semicolon(forth_context* ctx);
 static int forthi_word_THEN(forth_context* ctx);
@@ -758,6 +759,7 @@ static int forthi_compile_function_call(forth_context* ctx, forth_c_func fn)
         fn == forthi_word_DO ||
         fn == forthi_word_LOOP ||
         fn == forthi_word_plus_loop ||
+        fn == forthi_word_slash_loop ||
         fn == forthi_word_BEGIN ||
         fn == forthi_word_UNTIL ||
         fn == forthi_word_REPEAT ||
@@ -1150,6 +1152,55 @@ static int forthi_word_plus_loop(forth_context* ctx)
         if ((diff > 0 && i < i_tick) || (diff <= 0 && i >= i_tick))
         {
             ctx->return_stack[ctx->return_stack_pointer - 1].int_value = i;
+
+            if (forthi_check_valid_memory_range(ctx, ctx->program_pointer, sizeof(forth_pointer)) == FORTH_FAILURE)
+                return FORTH_FAILURE;
+
+            ctx->program_pointer = *(forth_pointer*)&ctx->memory[ctx->program_pointer];
+            return FORTH_SUCCESS;
+        }
+
+        ctx->program_pointer += sizeof(forth_pointer);
+        return forthi_pop_return(ctx, 2);
+    }
+
+    return FORTH_FAILURE;
+}
+
+static int forthi_word_slash_loop(forth_context* ctx)
+{
+    if (ctx->state == FORTHI_STATE_INTERPRET)
+    {
+        FORTH_LOG(ctx, "Interpreting a compile-only word\n");
+        return FORTH_FAILURE;
+    }
+
+    if (ctx->state == FORTHI_STATE_COMPILE)
+    {
+        if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        return forthi_write_pointer(ctx, ctx->stack[ctx->stack_pointer].pointer_value);
+    }
+
+    if (ctx->state == FORTHI_STATE_EXECUTE)
+    {
+        if (ctx->return_stack_pointer < 2)
+        {
+            FORTH_LOG(ctx, "Return stack underflow\n");
+            return FORTH_FAILURE;
+        }
+
+        if (forthi_pop(ctx, 1) == FORTH_FAILURE)
+            return FORTH_FAILURE;
+
+        forth_uint i = ctx->return_stack[ctx->return_stack_pointer - 1].uint_value;
+        forth_uint i_tick = ctx->return_stack[ctx->return_stack_pointer - 2].uint_value;
+        forth_uint inc = ctx->stack[ctx->stack_pointer].uint_value;
+        i += inc;
+        if (i < i_tick)
+        {
+            ctx->return_stack[ctx->return_stack_pointer - 1].uint_value = i;
 
             if (forthi_check_valid_memory_range(ctx, ctx->program_pointer, sizeof(forth_pointer)) == FORTH_FAILURE)
                 return FORTH_FAILURE;
@@ -4475,6 +4526,7 @@ static int forthi_defineStandardWords(forth_context* ctx)
     FORTHI_DEFINE_STANDARD_WORD("+!", forthi_word_plus_store);
     FORTHI_DEFINE_STANDARD_WORD("+FIELD", forthi_word_plus_field);
     FORTHI_DEFINE_STANDARD_WORD("+LOOP", forthi_word_plus_loop);
+    FORTHI_DEFINE_STANDARD_WORD("/LOOP", forthi_word_slash_loop);
     FORTHI_DEFINE_STANDARD_WORD("+X/STRING", forthi_word_plus_x_string);
     FORTHI_DEFINE_STANDARD_WORD(",", forthi_word_comma);
     FORTHI_DEFINE_STANDARD_WORD("-", forthi_word_minus);
