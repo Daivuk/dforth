@@ -38,10 +38,22 @@ jobs:
       # Execute the build.  You can specify a specific target with "--target <NAME>"
       run: cmake --build . --config $BUILD_TYPE
 
-    - name: Test
+    - name: Test 8 bits
       working-directory: ${{runner.workspace}}/build
       shell: bash
       run: ./forth_tests_8bits
+
+    - name: Test 16 bits
+      working-directory: ${{runner.workspace}}/build
+      shell: bash
       run: ./forth_tests_16bits
+
+    - name: Test 32 bits
+      working-directory: ${{runner.workspace}}/build
+      shell: bash
       run: ./forth_tests_32bits
+
+    - name: Test 64 bits
+      working-directory: ${{runner.workspace}}/build
+      shell: bash
       run: ./forth_tests_64bits
