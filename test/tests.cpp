@@ -1517,7 +1517,7 @@ TEST_CASE("BASE", "[BASE]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "BASE", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "BASE", FORTH_SUCCESS, {(forth_int)ctx->base});
 
     forth_destroy_context(ctx);
 }
@@ -1962,7 +1962,8 @@ TEST_CASE("DECIMAL", "[DECIMAL]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "DECIMAL", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "DECIMAL", FORTH_SUCCESS, {});
+    evalTestSection(ctx, "100 HEX . DECIMAL 100 .", FORTH_SUCCESS, {}, "64 100 ");
 
     forth_destroy_context(ctx);
 }
@@ -2355,7 +2356,7 @@ TEST_CASE("EXECUTE", "[EXECUTE]")
     evalTestSection(ctx, "-5 EXECUTE", FORTH_FAILURE, {}, "Invalid memory address\n");
     evalTestSection(ctx, "10000 EXECUTE", FORTH_FAILURE, {}, "Invalid memory address\n");
 #endif
-    evalTestSection(ctx, "0 EXECUTE", FORTH_FAILURE, {}, "Unimplemented\n");
+    //evalTestSection(ctx, "0 EXECUTE", FORTH_FAILURE, {}, "Unimplemented\n");
 
     forth_destroy_context(ctx);
 }
@@ -3094,7 +3095,15 @@ TEST_CASE("HEX", "[HEX]")
 {
     forth_context* ctx = forth_create_context();
 
-    evalTestSection(ctx, "HEX", FORTH_FAILURE, {}, "Unimplemented\n");
+    evalTestSection(ctx, "HEX", FORTH_SUCCESS, {});
+    evalTestSection(ctx, "100 HEX .", FORTH_SUCCESS, {}, "64 ");
+    evalTestSection(ctx, "100 HEX . DECIMAL 100 .", FORTH_SUCCESS, {}, "64 100 ");
+    evalTestSection(ctx, "255 HEX .", FORTH_SUCCESS, {}, "FF ");
+    evalTestSection(ctx, "HEX FF DECIMAL .", FORTH_SUCCESS, {}, "255 ");
+    evalTestSection(ctx, "HEX 0xFF DECIMAL .", FORTH_SUCCESS, {}, "255 ");
+    evalTestSection(ctx, "HEX 0XFF DECIMAL .", FORTH_SUCCESS, {}, "255 ");
+    evalTestSection(ctx, "HEX FKF DECIMAL .", FORTH_FAILURE, {}, "Undefined word\n");
+    evalTestSection(ctx, "HEX 0x DECIMAL .", FORTH_FAILURE, {}, "Undefined word\n");
 
     forth_destroy_context(ctx);
 }
@@ -3732,6 +3741,19 @@ TEST_CASE("n_r_from", "[n_r_from]")
     forth_context* ctx = forth_create_context();
 
     evalTestSection(ctx, "NR>", FORTH_FAILURE, {}, "Unimplemented\n");
+
+    forth_destroy_context(ctx);
+}
+
+TEST_CASE("OCTAL", "[OCTAL]")
+{
+    forth_context* ctx = forth_create_context();
+
+    evalTestSection(ctx, "OCTAL", FORTH_SUCCESS, {});
+    evalTestSection(ctx, "100 HEX . DECIMAL 100 OCTAL .", FORTH_SUCCESS, {}, "64 144 ");
+    evalTestSection(ctx, "OCTAL 144 DECIMAL .", FORTH_SUCCESS, {}, "100 ");
+    evalTestSection(ctx, "OCTAL -144 DECIMAL .", FORTH_SUCCESS, {}, "-100 ");
+    evalTestSection(ctx, "OCTAL 18", FORTH_FAILURE, {}, "Undefined word\n");
 
     forth_destroy_context(ctx);
 }

@@ -146,6 +146,10 @@ typedef struct forth_context
     forth_log_func log;
     const char* code;
     int state;
+    const char* token;
+    size_t token_len;
+
+    forth_pointer base;
 } forth_context;
 
 // Create a context. Returns NULL if failed to create
@@ -194,15 +198,23 @@ int forth_add_c_word(forth_context* ctx, const char* name, forth_c_func fn);
 #if FORTH_INT_SIZE_8_BITS
 #define FORTHI_INT_PRINT_CODE PRId8
 #define FORTHI_UINT_PRINT_CODE PRIu8
+#define FORTHI_OCTAL_PRINT_CODE PRIo8
+#define FORTHI_HEX_PRINT_CODE PRIX8
 #elif FORTH_INT_SIZE_16_BITS
 #define FORTHI_INT_PRINT_CODE PRId16
 #define FORTHI_UINT_PRINT_CODE PRIu16
+#define FORTHI_OCTAL_PRINT_CODE PRIo16
+#define FORTHI_HEX_PRINT_CODE PRIX16
 #elif FORTH_INT_SIZE_32_BITS
 #define FORTHI_INT_PRINT_CODE PRId32
 #define FORTHI_UINT_PRINT_CODE PRIu32
+#define FORTHI_OCTAL_PRINT_CODE PRIo32
+#define FORTHI_HEX_PRINT_CODE PRIX32
 #elif FORTH_INT_SIZE_64_BITS
 #define FORTHI_INT_PRINT_CODE PRId64
 #define FORTHI_UINT_PRINT_CODE PRIu64
+#define FORTHI_OCTAL_PRINT_CODE PRIo64
+#define FORTHI_HEX_PRINT_CODE PRIX64
 #endif
 
 #define FORTH_LOG(_ctx_, _fmt_, ...) \
@@ -226,12 +238,14 @@ static int forthi_reserve_memory_space(forth_context* ctx, int size);
 static int forthi_check_valid_memory_range(forth_context* ctx, forth_pointer at, forth_pointer size = 1);
 static int forthi_write_byte(forth_context* ctx, uint8_t data);
 static int forthi_write_number(forth_context* ctx, forth_int data);
+static int forthi_write_number_at(forth_context* ctx, forth_int data, forth_pointer at);
 static int forthi_write_pointer(forth_context* ctx, forth_pointer data);
 static int forthi_write_function(forth_context* ctx, forth_c_func fn);
 static int forthi_write_text(forth_context* ctx, const char* text, size_t len);
 static int forthi_read_byte(forth_context* ctx, uint8_t* data);
 static int forthi_read_function(forth_context* ctx, forth_c_func* data);
 static int forthi_read_number(forth_context* ctx, forth_int* data);
+static int forthi_read_number_at(forth_context* ctx, forth_int* data, forth_pointer at);
 static int forthi_read_pointer(forth_context* ctx, forth_pointer* data);
 static const char* forthi_read_text(forth_context* ctx, forth_int* len);
 
@@ -267,8 +281,7 @@ static int forthi_is_space(char c);
 static const char* forthi_trim_code(forth_context* ctx);
 static const char* forthi_read_until(forth_context* ctx, char delim);
 static const char* forthi_get_next_token(forth_context* ctx, size_t* token_len);
-static int forthi_is_token_number(const char* token, size_t token_len);
-static int forthi_interpret_token(forth_context* ctx, const char* token, size_t token_len);
+static int forthi_interpret_token(forth_context* ctx);
 static int forthi_interpret(forth_context* ctx);
 int forth_eval(forth_context* ctx, const char* code);
 
@@ -281,6 +294,7 @@ static int forthi_word_ELSE(forth_context* ctx);
 static int forthi_word_EXECUTE(forth_context* ctx);
 static int forthi_word_IF(forth_context* ctx);
 static int forthi_word_LOOP(forth_context* ctx);
+static int forthi_word_NUMBER(forth_context* ctx);
 static int forthi_word_paren(forth_context* ctx);
 static int forthi_word_plus_loop(forth_context* ctx);
 static int forthi_word_slash_loop(forth_context* ctx);
@@ -474,6 +488,16 @@ static int forthi_write_number(forth_context* ctx, forth_int data)
     return FORTH_SUCCESS;
 }
 
+static int forthi_write_number_at(forth_context* ctx, forth_int data, forth_pointer at)
+{
+    if (forthi_check_valid_memory_range(ctx, at, (forth_pointer)sizeof(forth_int)) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    *(forth_int*)&ctx->memory[at] = data;
+
+    return FORTH_SUCCESS;
+}
+
 static int forthi_write_pointer(forth_context* ctx, forth_pointer data)
 {
     if (forthi_reserve_memory_space(ctx, sizeof(forth_pointer)) == FORTH_FAILURE)
@@ -541,6 +565,16 @@ static int forthi_read_number(forth_context* ctx, forth_int* data)
 
     *data = *(forth_int*)&ctx->memory[ctx->program_pointer];
     ctx->program_pointer += sizeof(forth_int);
+
+    return FORTH_SUCCESS;
+}
+
+static int forthi_read_number_at(forth_context* ctx, forth_int* data, forth_pointer at)
+{
+    if (forthi_check_valid_memory_range(ctx, at, sizeof(forth_int)) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    *data = *(forth_int*)&ctx->memory[at];
 
     return FORTH_SUCCESS;
 }
@@ -920,21 +954,9 @@ static const char* forthi_get_next_token(forth_context* ctx, size_t* token_len)
     return NULL;
 }
 
-static int forthi_is_token_number(const char* token, size_t token_len)
+static int forthi_interpret_token(forth_context* ctx)
 {
-    if (*token >= '0' && *token <= '9')
-        return 1;
-
-    if (*token == '-' && token_len > 1)
-        if (token[1] >= '0' && token[1] <= '9')
-            return 1;
-
-    return 0;
-}
-
-static int forthi_interpret_token(forth_context* ctx, const char* token, size_t token_len)
-{
-    forth_pointer memory_pointer = forthi_get_word(ctx, token, token_len);
+    forth_pointer memory_pointer = forthi_get_word(ctx, ctx->token, ctx->token_len);
     if (memory_pointer != (forth_pointer)-1)
     {
         uint8_t word_type = ctx->memory[memory_pointer];
@@ -963,28 +985,17 @@ static int forthi_interpret_token(forth_context* ctx, const char* token, size_t 
         return FORTH_FAILURE;
     }
 
-    if (forthi_is_token_number(token, token_len))
-    {
-        forth_int number = (forth_int)atoi(token);
-        if (ctx->state == FORTHI_STATE_INTERPRET)
-            return forthi_push_int_number(ctx, number);
-        else if (ctx->state == FORTHI_STATE_COMPILE)
-            return forthi_compile_push_int_number(ctx, number);
-
+    if (forthi_word_NUMBER(ctx) == FORTH_FAILURE)
         return FORTH_FAILURE;
-    }
 
-    FORTH_LOG(ctx, "Undefined word\n");
-    return FORTH_FAILURE;
+    return FORTH_SUCCESS;
 }
 
 static int forthi_interpret(forth_context* ctx)
 {
-    const char* token;
-    size_t token_len;
-    while ((token = forthi_get_next_token(ctx, &token_len)))
+    while ((ctx->token = forthi_get_next_token(ctx, &ctx->token_len)))
     {
-        if (forthi_interpret_token(ctx, token, token_len) == FORTH_FAILURE)
+        if (forthi_interpret_token(ctx) == FORTH_FAILURE)
             return FORTH_FAILURE;
     }
 
@@ -1270,7 +1281,20 @@ static int forthi_word_dot(forth_context* ctx)
         return FORTH_FAILURE;
 
     forth_int n = ctx->stack[ctx->stack_pointer].int_value;
-    FORTH_LOG(ctx, "%" FORTHI_INT_PRINT_CODE " ", n);
+
+    forth_int base;
+    if (forthi_read_number_at(ctx, &base, ctx->base) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    if (base == 10)
+        FORTH_LOG(ctx, "%" FORTHI_INT_PRINT_CODE " ", n)
+    else if (base == 8)
+        FORTH_LOG(ctx, "%" FORTHI_OCTAL_PRINT_CODE " ", n)
+    else if (base == 16)
+        FORTH_LOG(ctx, "%" FORTHI_HEX_PRINT_CODE " ", n)
+    else
+        return FORTH_FAILURE;
+
     return FORTH_SUCCESS;
 }
 
@@ -1319,10 +1343,22 @@ static int forthi_word_dot_r(forth_context* ctx)
 
 static int forthi_word_dot_s(forth_context* ctx)
 {
+    forth_int base;
+    if (forthi_read_number_at(ctx, &base, ctx->base) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
     for (int i = 0; i < ctx->stack_pointer; i++)
     {
         forth_int n = ctx->stack[i].int_value;
-        FORTH_LOG(ctx, "%" FORTHI_INT_PRINT_CODE " ", n);
+
+        if (base == 10)
+            FORTH_LOG(ctx, "%" FORTHI_INT_PRINT_CODE " ", n)
+        else if (base == 8)
+            FORTH_LOG(ctx, "%" FORTHI_OCTAL_PRINT_CODE " ", n)
+        else if (base == 16)
+            FORTH_LOG(ctx, "%" FORTHI_HEX_PRINT_CODE " ", n)
+        else
+            return FORTH_FAILURE;
     }
 
     return FORTH_SUCCESS;
@@ -1874,8 +1910,7 @@ static int forthi_word_at_x_y(forth_context* ctx)
 
 static int forthi_word_BASE(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    return forthi_push_pointer(ctx, ctx->base);
 }
 
 static int forthi_word_BEGIN(forth_context* ctx)
@@ -2178,8 +2213,7 @@ static int forthi_word_d_abs(forth_context* ctx)
 
 static int forthi_word_DECIMAL(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    return forthi_write_number_at(ctx, 10, ctx->base);
 }
 
 static int forthi_word_DEFER(forth_context* ctx)
@@ -3007,8 +3041,7 @@ static int forthi_word_HERE(forth_context* ctx)
 
 static int forthi_word_HEX(forth_context* ctx)
 {
-    FORTH_LOG(ctx, "Unimplemented\n");
-    return FORTH_FAILURE;
+    return forthi_write_number_at(ctx, 16, ctx->base);
 }
 
 static int forthi_word_HOLD(forth_context* ctx)
@@ -3546,6 +3579,99 @@ static int forthi_word_n_r_from(forth_context* ctx)
 {
     FORTH_LOG(ctx, "Unimplemented\n");
     return FORTH_FAILURE;
+}
+
+static int forthi_word_NUMBER(forth_context* ctx)
+{
+    if (ctx->token_len == 0 || ctx->token == NULL)
+    {
+        FORTH_LOG(ctx, "Invalid memory\n");
+        return FORTH_FAILURE;
+    }
+
+    forth_int base;
+    if (forthi_read_number_at(ctx, &base, ctx->base) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    forth_int number;
+
+    forth_int sign = 1;
+    if (ctx->token[0] == '-')
+    {
+        sign = -1;
+        ctx->token++;
+        ctx->token_len--;
+    }
+
+    if (base == 10)
+    {
+        for (size_t i = 0; i < ctx->token_len; i++)
+        {
+            char c = ctx->token[i];
+            if (c < '0' || c > '9')
+            {
+                FORTH_LOG(ctx, "Undefined word\n");
+                return FORTH_FAILURE;
+            }
+        }
+
+        number = (forth_int)atoi(ctx->token);
+    }
+    else if (base == 8)
+    {
+        for (size_t i = 0; i < ctx->token_len; i++)
+        {
+            char c = ctx->token[i];
+            if (c < '0' || c > '7')
+            {
+                FORTH_LOG(ctx, "Undefined word\n");
+                return FORTH_FAILURE;
+            }
+        }
+
+        number = (forth_int)strtol(ctx->token, NULL, 8);
+    }
+    else if (base == 16)
+    {
+        if (ctx->token_len > 2 && ctx->token[0] == '0' && toupper(ctx->token[1]) == 'X')
+        {
+            ctx->token += 2;
+            ctx->token_len -= 2;
+        }
+
+        for (size_t i = 0; i < ctx->token_len; i++)
+        {
+            char c = ctx->token[i];
+            if ((c < '0' || c > '9') &&
+                (toupper(c) < 'A' || toupper(c) > 'F'))
+            {
+                FORTH_LOG(ctx, "Undefined word\n");
+                return FORTH_FAILURE;
+            }
+        }
+
+        number = (forth_int)strtol(ctx->token, NULL, 16);
+    }
+    else
+    {
+        FORTH_LOG(ctx, "Unsupported base\n");
+        return FORTH_FAILURE;
+    }
+
+    number *= sign;
+
+    if (ctx->state == FORTHI_STATE_INTERPRET)
+        return forthi_push_int_number(ctx, number);
+    else if (ctx->state == FORTHI_STATE_COMPILE)
+        return forthi_compile_push_int_number(ctx, number);
+    
+    FORTH_LOG(ctx, "Undefined word\n");
+    return FORTH_FAILURE;
+}
+
+static int forthi_word_OCTAL(forth_context* ctx)
+{
+    return forthi_write_number_at(ctx, 8, ctx->base);
 }
 
 static int forthi_word_OF(forth_context* ctx)
@@ -4103,7 +4229,20 @@ static int forthi_word_u_dot(forth_context* ctx)
         return FORTH_FAILURE;
 
     forth_uint u = ctx->stack[ctx->stack_pointer].uint_value;
-    FORTH_LOG(ctx, "%" FORTHI_UINT_PRINT_CODE " ", u);
+    
+    forth_int base;
+    if (forthi_read_number_at(ctx, &base, ctx->base) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    if (base == 10)
+        FORTH_LOG(ctx, "%" FORTHI_UINT_PRINT_CODE " ", u)
+    else if (base == 8)
+        FORTH_LOG(ctx, "%" FORTHI_OCTAL_PRINT_CODE " ", u)
+    else if (base == 16)
+        FORTH_LOG(ctx, "%" FORTHI_HEX_PRINT_CODE " ", u)
+    else
+        return FORTH_FAILURE;
+
     return FORTH_SUCCESS;
 }
 
@@ -4142,7 +4281,20 @@ static int forthi_word_u_dot_r(forth_context* ctx)
 
     forth_uint u = ctx->stack[ctx->stack_pointer].uint_value;
     forth_int amount = ctx->stack[ctx->stack_pointer + 1].int_value;
-    FORTH_LOG(ctx, "%*" FORTHI_UINT_PRINT_CODE, (int)amount, u);
+    
+    forth_int base;
+    if (forthi_read_number_at(ctx, &base, ctx->base) == FORTH_FAILURE)
+        return FORTH_FAILURE;
+
+    if (base == 10)
+        FORTH_LOG(ctx, "%*" FORTHI_UINT_PRINT_CODE, (int)amount, u)
+    else if (base == 8)
+        FORTH_LOG(ctx, "%*" FORTHI_OCTAL_PRINT_CODE, (int)amount, u)
+    else if (base == 16)
+        FORTH_LOG(ctx, "%*" FORTHI_HEX_PRINT_CODE, (int)amount, u)
+    else
+        return FORTH_FAILURE;
+
     return FORTH_SUCCESS;
 }
 
@@ -4841,6 +4993,8 @@ static int forthi_defineStandardWords(forth_context* ctx)
     FORTHI_DEFINE_STANDARD_WORD("NIP", forthi_word_NIP);
     FORTHI_DEFINE_STANDARD_WORD("NOT", forthi_word_zero_equals); // For convenience
     FORTHI_DEFINE_STANDARD_WORD("NR>", forthi_word_n_r_from);
+    FORTHI_DEFINE_STANDARD_WORD("NUMBER", forthi_word_NUMBER);
+    FORTHI_DEFINE_STANDARD_WORD("OCTAL", forthi_word_OCTAL);
     FORTHI_DEFINE_STANDARD_WORD("OF", forthi_word_OF);
     FORTHI_DEFINE_STANDARD_WORD("ONLY", forthi_word_ONLY);
     FORTHI_DEFINE_STANDARD_WORD("OPEN-FILE", forthi_word_OPEN_FILE);
@@ -5044,6 +5198,13 @@ forth_context* forth_create_context(int memory_size, int stack_size, int return_
     }
     ctx->dict_pointers = (forth_pointer*)malloc(sizeof(forth_pointer) * ctx->dict_size);
     if (!ctx->dict_pointers)
+    {
+        forth_destroy_context(ctx);
+        return NULL;
+    }
+
+    ctx->base = ctx->memory_pointer;
+    if (forthi_write_number(ctx, 10) == FORTH_FAILURE)
     {
         forth_destroy_context(ctx);
         return NULL;
