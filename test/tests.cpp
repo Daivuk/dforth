@@ -3099,9 +3099,15 @@ TEST_CASE("HEX", "[HEX]")
     evalTestSection(ctx, "100 HEX .", FORTH_SUCCESS, {}, "64 ");
     evalTestSection(ctx, "100 HEX . DECIMAL 100 .", FORTH_SUCCESS, {}, "64 100 ");
     evalTestSection(ctx, "255 HEX .", FORTH_SUCCESS, {}, "FF ");
+#if FORTH_INT_SIZE_8_BITS
+    evalTestSection(ctx, "HEX FF DECIMAL .", FORTH_SUCCESS, {}, "-1 ");
+    evalTestSection(ctx, "HEX 0xFF DECIMAL .", FORTH_SUCCESS, {}, "-1 ");
+    evalTestSection(ctx, "HEX 0XFF DECIMAL .", FORTH_SUCCESS, {}, "-1 ");
+#else
     evalTestSection(ctx, "HEX FF DECIMAL .", FORTH_SUCCESS, {}, "255 ");
     evalTestSection(ctx, "HEX 0xFF DECIMAL .", FORTH_SUCCESS, {}, "255 ");
     evalTestSection(ctx, "HEX 0XFF DECIMAL .", FORTH_SUCCESS, {}, "255 ");
+#endif
     evalTestSection(ctx, "HEX FKF DECIMAL .", FORTH_FAILURE, {}, "Undefined word\n");
     evalTestSection(ctx, "HEX 0x DECIMAL .", FORTH_FAILURE, {}, "Undefined word\n");
 
