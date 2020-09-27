@@ -1289,9 +1289,9 @@ static int forthi_word_dot(forth_context* ctx)
     if (base == 10)
         FORTH_LOG(ctx, "%" FORTHI_INT_PRINT_CODE " ", n)
     else if (base == 8)
-        FORTH_LOG(ctx, "%" FORTHI_OCTAL_PRINT_CODE " ", n)
+        FORTH_LOG(ctx, "%" FORTHI_OCTAL_PRINT_CODE " ", (forth_uint)n)
     else if (base == 16)
-        FORTH_LOG(ctx, "%" FORTHI_HEX_PRINT_CODE " ", n)
+        FORTH_LOG(ctx, "%" FORTHI_HEX_PRINT_CODE " ", (forth_uint)n)
     else
         return FORTH_FAILURE;
 
